@@ -1,6 +1,7 @@
 # Context Engineering Learning Platform
 
 A local, single-page application and Express proxy built to help you experiment with, visualize, and evaluate the impact of various context layers on LLM outputs.
+Name of this Project is Contextum
 
 ## Architecture 
 
