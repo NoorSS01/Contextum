@@ -1,3 +1,4 @@
+// Importing libraries
 import { ContextConfig } from '@shared/types';
 import { CoreMessage } from 'ai';
 
