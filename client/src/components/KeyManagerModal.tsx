@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { ProviderId } from '@shared/types';
 import { saveKey, hasKeyStored, deleteKey } from '../services/keys';
 import { KeyRound, Check, X, Trash2 } from 'lucide-react';
@@ -26,19 +26,19 @@ export const KeyManagerModal: React.FC<Props> = ({ isOpen, onClose, onPassphrase
   const [newKeyValues, setNewKeyValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      checkKeys();
-    }
-  }, [isOpen]);
-
-  const checkKeys = async () => {
+  const checkKeys = useCallback(async () => {
     const status: Record<string, boolean> = {};
     for (const p of PROVIDERS) {
       status[p.id] = await hasKeyStored(p.id);
     }
     setKeysStatus(status);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      void Promise.resolve().then(checkKeys);
+    }
+  }, [checkKeys, isOpen]);
 
   const handleSetPassphrase = () => {
     if (inputPassphrase.length < 4) {

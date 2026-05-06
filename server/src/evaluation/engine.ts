@@ -1,6 +1,6 @@
 import { generateObject, LanguageModel } from 'ai';
 import { z } from 'zod';
-import { EvaluationMetrics } from '@shared/types';
+import type { EvaluationMetrics } from '@shared/types';
 
 const evaluationSchema = z.object({
   relevance: z.number().min(0).max(100).describe("Score 0-100: How relevant is the response to the user's prompt?"),

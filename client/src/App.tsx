@@ -10,6 +10,30 @@ import { ProviderId, EvaluationMetrics, ResponseResult, ScenarioPreset } from '@
 import { SCENARIOS } from './data/scenarios';
 import { KeyRound, Layers, FlaskConical, Play, StopCircle, BookOpen } from 'lucide-react';
 
+const API_BASE_URL = '/api';
+
+const parseDataStreamLine = (line: string): string => {
+  if (!line.startsWith('0:')) return '';
+
+  try {
+    const parsed = JSON.parse(line.slice(2));
+    return typeof parsed === 'string' ? parsed : '';
+  } catch {
+    return '';
+  }
+};
+
+const readErrorMessage = async (response: Response): Promise<string> => {
+  const text = await response.text();
+
+  try {
+    const parsed = JSON.parse(text) as { error?: string };
+    return parsed.error || text;
+  } catch {
+    return text;
+  }
+};
+
 function App() {
   const [isKeyModalOpen, setKeyModalOpen] = useState(false);
   const [passphrase, setPassphrase] = useState<string>('');
@@ -56,65 +80,76 @@ function App() {
     abortControllerRef.current = new AbortController();
 
     const startTime = Date.now();
+    const contextConfig = getConfig();
     let fullText = '';
+    let streamBuffer = '';
 
     try {
-      const response = await fetch('http://localhost:3001/api/generate', {
+      const response = await fetch(`${API_BASE_URL}/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           providerId,
           prompt,
-          contextConfig: getConfig(),
+          contextConfig,
           keys: { [providerId]: key }
         }),
         signal: abortControllerRef.current.signal
       });
 
       if (!response.ok) {
-        throw new Error(await response.text());
+        throw new Error(await readErrorMessage(response));
       }
 
       if (!response.body) throw new Error('No response body');
       
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
+      const isTextStream = response.headers.get('content-type')?.includes('text/plain');
       
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
-        
+
         const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
+
+        if (isTextStream) {
+          fullText += chunk;
+          setOutput(fullText);
+          continue;
+        }
+        
+        streamBuffer += chunk;
+        const lines = streamBuffer.split('\n');
+        streamBuffer = lines.pop() || '';
         
         for (const line of lines) {
-          if (line.startsWith('0:')) {
-            try {
-              const textChunk = JSON.parse(line.slice(2));
-              if (typeof textChunk === 'string') {
-                fullText += textChunk;
-                setOutput(fullText);
-              }
-            } catch (e) {}
-          } else if (line && !line.match(/^[0-9]:/)) {
-            fullText += line;
-            setOutput(fullText);
-          }
+          const textChunk = parseDataStreamLine(line);
+          if (!textChunk) continue;
+
+          fullText += textChunk;
+          setOutput(fullText);
         }
+      }
+
+      const finalChunk = parseDataStreamLine(streamBuffer.trim());
+      if (finalChunk) {
+        fullText += finalChunk;
+        setOutput(fullText);
       }
 
       setIsGenerating(false);
       setIsEvaluating(true);
       const responseTimeMs = Date.now() - startTime;
       
-      const evalRes = await fetch('http://localhost:3001/api/evaluate', {
+      const evalRes = await fetch(`${API_BASE_URL}/evaluate`, {
          method: 'POST',
          headers: { 'Content-Type': 'application/json' },
          body: JSON.stringify({
            providerId,
            prompt,
            responseText: fullText,
-           contextConfig: getConfig(),
+           contextConfig,
            keys: { [providerId]: key }
          })
       });
@@ -130,7 +165,7 @@ function App() {
         id: Math.random().toString(36).substring(7),
         providerId,
         prompt,
-        contextConfig: getConfig(),
+        contextConfig,
         responseText: fullText,
         responseTimeMs,
         tokenCount: 0, // Mocked for now
@@ -139,10 +174,17 @@ function App() {
         timestamp: new Date().toISOString()
       }, ...prev]);
       
-    } catch (error: any) {
-      if (error.name !== 'AbortError') {
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return;
+      }
+
+      if (error instanceof Error) {
         console.error(error);
         alert(`Generation failed: ${error.message}`);
+      } else {
+        console.error(error);
+        alert('Generation failed: Unknown error');
       }
     } finally {
       setIsGenerating(false);

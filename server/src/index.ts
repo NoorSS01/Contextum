@@ -6,7 +6,7 @@ import { streamText } from 'ai';
 import { getModel, ProviderKeys } from './providers/registry';
 import { buildMessages } from './context/builder';
 import { evaluateResponse } from './evaluation/engine';
-import { ProviderId, ContextConfig } from '@shared/types';
+import type { ProviderId, ContextConfig } from '@shared/types';
 
 dotenv.config();
 
@@ -28,7 +28,7 @@ app.post('/api/generate', async (req, res) => {
   try {
     const { providerId, prompt, contextConfig, keys } = req.body as GenerateRequest;
 
-    if (!providerId || !prompt || !keys) {
+    if (!providerId || !prompt || !contextConfig || !keys) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -43,7 +43,7 @@ app.post('/api/generate', async (req, res) => {
       // Calculate token info roughly manually or rely on the metadata if available
     });
 
-    result.pipeDataStreamToResponse(res);
+    result.pipeTextStreamToResponse(res);
   } catch (error: any) {
     logger.error(error, 'Generate API error');
     res.status(500).json({ error: error?.message || 'Generation failed' });
@@ -53,6 +53,10 @@ app.post('/api/generate', async (req, res) => {
 app.post('/api/evaluate', async (req, res) => {
   try {
     const { providerId, prompt, responseText, contextConfig, keys } = req.body;
+
+    if (!providerId || !prompt || !responseText || !contextConfig || !keys) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
     
     // Evaluate using the active provider
     const model = getModel(providerId, keys);

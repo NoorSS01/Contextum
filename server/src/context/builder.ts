@@ -1,9 +1,8 @@
-// Importing libraries
-import { ContextConfig } from '@shared/types';
-import { CoreMessage } from 'ai';
+import type { ContextConfig } from '@shared/types';
+import type { ModelMessage } from 'ai';
 
-export const buildMessages = (userPrompt: string, config: ContextConfig): CoreMessage[] => {
-  const messages: CoreMessage[] = [];
+export const buildMessages = (userPrompt: string, config: ContextConfig): ModelMessage[] => {
+  const messages: ModelMessage[] = [];
   let systemText = '';
 
   const getLayerContent = (id: string) => {
@@ -50,6 +49,3 @@ export const buildMessages = (userPrompt: string, config: ContextConfig): CoreMe
 
   return messages;
 };
-
-
-// this is context builder file.

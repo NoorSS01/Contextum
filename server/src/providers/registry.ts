@@ -3,8 +3,7 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createCohere } from '@ai-sdk/cohere';
 import { createMistral } from '@ai-sdk/mistral';
-import { ProviderId } from '@shared/types';
-import { CoreMessage } from 'ai';
+import type { ProviderId } from '@shared/types';
 
 export interface ProviderKeys {
   openai?: string;
