@@ -35,9 +35,3 @@ The system handles keys locally in your browser. When you "unlock the vault", th
 5. **Run Experiments:**
    Load a Scenario Preset or write your own prompt. Toggle context layers, run generations, and view LLM-as-judge scores.
 
-## Features Developed in Phase 1
-- **7 Provider Support:** OpenAI, Google Gemini, Anthropic Claude, Cohere, Mistral, Groq, Together.
-- **Dynamic Context Builder:** 6 configurable layers (System/Persona, Base Instructions, Prompt Enhancer, RAG Context, History, Safety Guardrails).
-- **LLM-as-Judge Evaluation Component:** Asynchronously rates the generation on five metrics (Relevance, Coherence, Completeness, Hallucination Risk, Instruction Adherence).
-- **Comparative Analysis Table:** Side-by-side history of responses with full visual breakdown.
-- **Vault:** Local-first, AES-GCM encrypted API key manager stored natively in the browser via `idb`. No database or cloud storage.
