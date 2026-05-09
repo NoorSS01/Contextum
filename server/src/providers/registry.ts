@@ -15,35 +15,64 @@ export interface ProviderKeys {
   together?: string;
 }
 
-export const getModel = (providerId: ProviderId, keys: ProviderKeys) => {
+const getProviderKey = (
+  keys: ProviderKeys | undefined,
+  providerId: ProviderId,
+  envNames: string[]
+) => {
+  return keys?.[providerId] || envNames.map(name => process.env[name]).find(Boolean);
+};
+
+export const getModel = (providerId: ProviderId, keys?: ProviderKeys) => {
   switch (providerId) {
     case 'openai':
-      if (!keys.openai) throw new Error('OpenAI key required');
-      return createOpenAI({ apiKey: keys.openai })('gpt-4o');
+      {
+        const apiKey = getProviderKey(keys, providerId, ['OPENAI_API_KEY']);
+        if (!apiKey) throw new Error('OpenAI key required');
+        return createOpenAI({ apiKey })('gpt-4o');
+      }
     
     case 'google':
-      if (!keys.google) throw new Error('Google Generative AI key required');
-      return createGoogleGenerativeAI({ apiKey: keys.google })('gemini-1.5-pro-latest');
+      {
+        const apiKey = getProviderKey(keys, providerId, ['GOOGLE_GENERATIVE_AI_API_KEY', 'GEMINI_API_KEY']);
+        if (!apiKey) throw new Error('Google Generative AI key required');
+        return createGoogleGenerativeAI({ apiKey })('gemini-2.5-flash');
+      }
       
     case 'anthropic':
-      if (!keys.anthropic) throw new Error('Anthropic key required');
-      return createAnthropic({ apiKey: keys.anthropic })('claude-3-5-sonnet-20240620');
+      {
+        const apiKey = getProviderKey(keys, providerId, ['ANTHROPIC_API_KEY']);
+        if (!apiKey) throw new Error('Anthropic key required');
+        return createAnthropic({ apiKey })('claude-3-5-sonnet-20240620');
+      }
       
     case 'cohere':
-      if (!keys.cohere) throw new Error('Cohere key required');
-      return createCohere({ apiKey: keys.cohere })('command-r-plus');
+      {
+        const apiKey = getProviderKey(keys, providerId, ['COHERE_API_KEY']);
+        if (!apiKey) throw new Error('Cohere key required');
+        return createCohere({ apiKey })('command-r-plus');
+      }
       
     case 'mistral':
-      if (!keys.mistral) throw new Error('Mistral key required');
-      return createMistral({ apiKey: keys.mistral })('mistral-large-latest');
+      {
+        const apiKey = getProviderKey(keys, providerId, ['MISTRAL_API_KEY']);
+        if (!apiKey) throw new Error('Mistral key required');
+        return createMistral({ apiKey })('mistral-large-latest');
+      }
       
     case 'groq': // Groq provides an OpenAI-compatible API
-      if (!keys.groq) throw new Error('Groq key required');
-      return createOpenAI({ apiKey: keys.groq, baseURL: 'https://api.groq.com/openai/v1' })('llama3-70b-8192');
+      {
+        const apiKey = getProviderKey(keys, providerId, ['GROQ_API_KEY']);
+        if (!apiKey) throw new Error('Groq key required');
+        return createOpenAI({ apiKey, baseURL: 'https://api.groq.com/openai/v1' })('llama3-70b-8192');
+      }
       
     case 'together': // Together provides an OpenAI-compatible API
-      if (!keys.together) throw new Error('Together AI key required');
-      return createOpenAI({ apiKey: keys.together, baseURL: 'https://api.together.xyz/v1' })('meta-llama/Llama-3-70b-chat-hf');
+      {
+        const apiKey = getProviderKey(keys, providerId, ['TOGETHER_API_KEY']);
+        if (!apiKey) throw new Error('Together AI key required');
+        return createOpenAI({ apiKey, baseURL: 'https://api.together.xyz/v1' })('meta-llama/Llama-3-70b-chat-hf');
+      }
       
     default:
       throw new Error(`Unsupported provider: ${providerId}`);

@@ -8,7 +8,7 @@ import { useContextEngine } from './hooks/useContextEngine';
 import { loadKey } from './services/keys';
 import { ProviderId, EvaluationMetrics, ResponseResult, ScenarioPreset } from '@shared/types';
 import { SCENARIOS } from './data/scenarios';
-import { KeyRound, Layers, FlaskConical, Play, StopCircle, BookOpen } from 'lucide-react';
+import { KeyRound, Layers, FlaskConical, Play, StopCircle, BookOpen, Activity, ShieldCheck, Sparkles } from 'lucide-react';
 
 const API_BASE_URL = '/api';
 
@@ -56,22 +56,12 @@ function App() {
   };
 
   const handleGenerate = async () => {
-    if (!passphrase) {
-      alert("Please set a vault passphrase and configure an API key first.");
-      setKeyModalOpen(true);
-      return;
-    }
     if (!prompt.trim()) {
       alert("Please enter a prompt.");
       return;
     }
 
-    const key = await loadKey(providerId, passphrase);
-    if (!key) {
-      alert(`No valid API key found for ${providerId}. Please update your vault.`);
-      setKeyModalOpen(true);
-      return;
-    }
+    const key = passphrase ? await loadKey(providerId, passphrase) : null;
 
     setOutput('');
     setMetrics(null);
@@ -92,13 +82,21 @@ function App() {
           providerId,
           prompt,
           contextConfig,
-          keys: { [providerId]: key }
+          keys: key ? { [providerId]: key } : {}
         }),
         signal: abortControllerRef.current.signal
       });
 
       if (!response.ok) {
-        throw new Error(await readErrorMessage(response));
+        const message = await readErrorMessage(response);
+        if (message.toLowerCase().includes('key required')) {
+          setKeyModalOpen(true);
+          throw new Error(
+            `${message}. Add a key in the Vault, or set a matching API key in the server .env file.`
+          );
+        }
+
+        throw new Error(message);
       }
 
       if (!response.body) throw new Error('No response body');
@@ -138,6 +136,12 @@ function App() {
         setOutput(fullText);
       }
 
+      if (!fullText.trim()) {
+        throw new Error(
+          'The provider returned an empty response. Check that the selected model is available for your API key and try again.'
+        );
+      }
+
       setIsGenerating(false);
       setIsEvaluating(true);
       const responseTimeMs = Date.now() - startTime;
@@ -150,7 +154,7 @@ function App() {
            prompt,
            responseText: fullText,
            contextConfig,
-           keys: { [providerId]: key }
+           keys: key ? { [providerId]: key } : {}
          })
       });
       
@@ -199,102 +203,146 @@ function App() {
   };
 
   return (
-    <>
-      <header style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-secondary)', padding: '1rem 2rem' }}>
-        <div className="container" style={{ padding: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div className="flex items-center gap-2">
-            <FlaskConical className="text-accent-primary" />
-            <h1 style={{ margin: 0, fontSize: '1.5rem', letterSpacing: '-0.5px' }}>Context Engineering</h1>
+    <div className="app-shell">
+      <header className="topbar">
+        <div className="topbar__brand">
+          <div className="brand-mark">
+            <FlaskConical size={22} />
           </div>
-          
-          <div className="flex items-center gap-4">
-            <ProviderSelector selectedId={providerId} onSelect={setProviderId} />
-            <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--border-color)' }}></div>
-            <button className="secondary" onClick={() => setKeyModalOpen(true)}>
-              <KeyRound size={18} />
-              Vault {passphrase ? '(Unlocked)' : '(Locked)'}
-            </button>
+          <div>
+            <h1>Contextum</h1>
+            <p>Context engineering lab</p>
           </div>
         </div>
+
+        <div className="topbar__actions">
+            <ProviderSelector selectedId={providerId} onSelect={setProviderId} />
+          <button className={passphrase ? 'button button--success' : 'button button--secondary'} onClick={() => setKeyModalOpen(true)}>
+              <KeyRound size={18} />
+            Vault {passphrase ? 'Unlocked' : 'Locked'}
+            </button>
+          </div>
       </header>
 
-      <main className="container flex-col mt-4 gap-6">
-        <div className="flex gap-6 w-full">
-          {/* Left Column: Context & Input */}
-          <div className="flex-col gap-4" style={{ flex: 1, minWidth: 0 }}>
-            
-            <div className="glass-panel p-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <BookOpen className="text-accent-primary" size={18} />
-                <span style={{ fontWeight: 500 }}>Load Scenario Preset:</span>
+      <main className="app-main">
+        <section className="hero-band">
+          <div>
+            <p className="eyebrow"><Sparkles size={14} /> Experiment Workbench</p>
+            <h2>Build, test, and score context layers with a cleaner signal path.</h2>
+          </div>
+          <div className="status-strip">
+            <div className="status-pill">
+              <Activity size={16} />
+              <span>{experiments.length} runs</span>
               </div>
-              <select onChange={e => {
+            <div className="status-pill">
+              <ShieldCheck size={16} />
+              <span>{layers.filter(layer => layer.enabled).length} active layers</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="preset-bar">
+          <div className="section-title section-title--compact">
+            <BookOpen size={18} />
+            <div>
+              <h2>Scenario Preset</h2>
+              <p>Load a ready-made context stack, then edit the layers below.</p>
+            </div>
+          </div>
+          <select
+            className="preset-select"
+            onChange={e => {
                 const s = SCENARIOS.find(x => x.id === e.target.value);
                 if (s) loadScenario(s);
-              }} defaultValue="" style={{ width: '200px' }}>
-                <option value="" disabled>Select Preset...</option>
+            }}
+            defaultValue=""
+          >
+                <option value="" disabled>Select preset</option>
                 {SCENARIOS.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
-            </div>
+        </section>
 
-            <div className="glass-panel p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Layers className="text-accent-primary" />
-                <h2 style={{ margin: 0 }}>Context Layers</h2>
+        <section className="workspace-grid">
+          <div className="workspace-column">
+            <section className="panel">
+              <div className="section-title">
+                <Layers size={20} />
+                <div>
+                  <h2>Context Layers</h2>
+                  <p>Control exactly what gets sent to the model.</p>
+                </div>
               </div>
+
               <ContextPanel 
                 layers={layers} 
                 onToggle={toggleLayer} 
                 onUpdateContent={updateLayerContent} 
               />
-            </div>
+            </section>
 
-            <div className="glass-panel p-6">
-              <h2 style={{ margin: 0, marginBottom: '1rem' }}>User Prompt</h2>
+            <section className="panel prompt-panel">
+              <div className="section-title">
+                <Sparkles size={20} />
+                <div>
+                  <h2>User Prompt</h2>
+                  <p>The live prompt tested against the selected context stack.</p>
+                </div>
+              </div>
               <textarea 
                 placeholder="Enter your prompt here..." 
-                rows={4} 
+                rows={5} 
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                style={{ resize: 'vertical' }}
+                className="prompt-input"
               />
-              <div className="flex justify-end mt-4">
+              <div className="prompt-actions">
                 {!isGenerating ? (
-                  <button className="primary" onClick={handleGenerate}>
+                  <button className="button button--primary" onClick={handleGenerate}>
                     <Play size={18} /> Generate Response
                   </button>
                 ) : (
-                  <button className="secondary" onClick={handleStop} style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}>
+                  <button className="button button--danger" onClick={handleStop}>
                     <StopCircle size={18} /> Stop Generation
                   </button>
                 )}
               </div>
-            </div>
+            </section>
           </div>
 
-          {/* Right Column: Output & Evaluation */}
-          <div className="flex-col gap-4" style={{ flex: 1, minWidth: 0 }}>
-            <div className="glass-panel p-6" style={{ minHeight: '300px', display: 'flex', flexDirection: 'column' }}>
-              <h2 style={{ margin: 0, marginBottom: '1rem' }}>Engine Output</h2>
-              <div style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: 'var(--radius-md)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowY: 'auto', maxHeight: '400px' }}>
-                {output ? output : <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>Awaiting generation...</span>}
+          <div className="workspace-column workspace-column--sticky">
+            <section className="panel output-panel">
+              <div className="section-title">
+                <Activity size={20} />
+                <div>
+                  <h2>Engine Output</h2>
+                  <p>Streaming model response from the active provider.</p>
+                </div>
               </div>
-            </div>
+              <div className="output-box">
+                {output ? output : <span>Awaiting generation...</span>}
+              </div>
+            </section>
 
-            <div className="glass-panel p-6">
-              <h2 style={{ margin: 0, marginBottom: '1rem' }}>Evaluation Engine</h2>
+            <section className="panel">
+              <div className="section-title">
+                <ShieldCheck size={20} />
+                <div>
+                  <h2>Evaluation Engine</h2>
+                  <p>Strict judge scores context adherence and response quality.</p>
+                </div>
+              </div>
               {(isEvaluating || metrics) ? (
                 <EvaluationScore metrics={metrics} loading={isEvaluating} />
               ) : (
-                <div style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                <div className="empty-state">
                   Run a generation to evaluate context quality.
                 </div>
               )}
-            </div>
+            </section>
           </div>
-        </div>
+        </section>
 
-        {/* Bottom Section: Experiments Comparison */}
         <ComparisonTable experiments={experiments} />
       </main>
 
@@ -303,7 +351,7 @@ function App() {
         onClose={() => setKeyModalOpen(false)} 
         onPassphraseSet={setPassphrase}
       />
-    </>
+    </div>
   );
 }
 

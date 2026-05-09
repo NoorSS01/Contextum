@@ -28,20 +28,26 @@ export const EvaluationScore: React.FC<Props> = ({ metrics, loading }) => {
     { name: 'Hallucination', value: metrics.hallucinationRisk, color: '#ef4444' },
   ];
 
+  const scoreClass =
+    metrics.overall >= 80 ? 'score-ring--good' : metrics.overall >= 50 ? 'score-ring--warn' : 'score-ring--bad';
+
   return (
-    <div className="flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h3>Overall Score: <span style={{ color: 'var(--accent-primary)', fontSize: '1.5rem' }}>{metrics.overall}/100</span></h3>
+    <div className="evaluation-card">
+      <div
+        className={`score-ring ${scoreClass}`}
+        style={{ '--score': metrics.overall } as React.CSSProperties}
+      >
+        <strong>{metrics.overall}</strong>
+        <span>/100</span>
       </div>
-      
-      <div style={{ width: '100%', height: 200, marginTop: '1rem' }}>
+      <div className="evaluation-chart">
         <ResponsiveContainer>
           <BarChart data={data} layout="vertical" margin={{ top: 0, right: 20, left: 20, bottom: 0 }}>
             <XAxis type="number" domain={[0, 100]} hide />
-            <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={100} style={{ fill: 'var(--text-primary)', fontSize: '0.8rem' }} />
+            <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={104} style={{ fill: 'var(--text-primary)', fontSize: '0.78rem' }} />
             <Tooltip 
               cursor={{ fill: 'transparent' }}
-              contentStyle={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px' }}
+              contentStyle={{ backgroundColor: 'var(--surface-2)', border: '1px solid var(--border-color)', borderRadius: '8px' }}
             />
             <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={16}>
               {data.map((entry, index) => (

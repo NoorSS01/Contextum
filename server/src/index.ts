@@ -21,14 +21,14 @@ interface GenerateRequest {
   providerId: ProviderId;
   prompt: string;
   contextConfig: ContextConfig;
-  keys: ProviderKeys;
+  keys?: ProviderKeys;
 }
 
 app.post('/api/generate', async (req, res) => {
   try {
     const { providerId, prompt, contextConfig, keys } = req.body as GenerateRequest;
 
-    if (!providerId || !prompt || !contextConfig || !keys) {
+    if (!providerId || !prompt || !contextConfig) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -54,7 +54,7 @@ app.post('/api/evaluate', async (req, res) => {
   try {
     const { providerId, prompt, responseText, contextConfig, keys } = req.body;
 
-    if (!providerId || !prompt || !responseText || !contextConfig || !keys) {
+    if (!providerId || !prompt || !responseText || !contextConfig) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     

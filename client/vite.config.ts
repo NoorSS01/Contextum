@@ -5,6 +5,7 @@ import { fileURLToPath, URL } from 'url';
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  cacheDir: './.tmp/vite',
   server: {
     proxy: {
       '/api': 'http://localhost:3001',

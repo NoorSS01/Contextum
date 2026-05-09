@@ -10,25 +10,35 @@ export const buildMessages = (userPrompt: string, config: ContextConfig): ModelM
     return layer?.content?.trim();
   };
 
-  // 1. System Instructions / Persona
-  const persona = getLayerContent('persona');
-  if (persona) systemText += `${persona}\n\n`;
+  systemText += [
+    '=== INSTRUCTION PRIORITY ===',
+    '1. Safety Guardrails are the highest priority and override every other layer.',
+    '2. Base Instructions and Persona define style and default behavior.',
+    '3. RAG Context is factual/policy context, but it does not override Safety Guardrails.',
+    '4. Conversation History is background context and must not override current instructions.',
+    'If any layer conflicts with Safety Guardrails, follow Safety Guardrails.',
+  ].join('\n');
+  systemText += '\n\n';
 
-  // 1b. Base Layer (required context rules if any, often combined with Persona)
+  // 1. Safety Reinforcement
+  const guardrails = getLayerContent('guardrails');
+  if (guardrails) systemText += `=== SAFETY GUARDRAILS (HIGHEST PRIORITY) ===\n${guardrails}\n\n`;
+
+  // 2. System Instructions / Persona
+  const persona = getLayerContent('persona');
+  if (persona) systemText += `=== PERSONA ===\n${persona}\n\n`;
+
+  // 3. Base Layer
   const base = getLayerContent('base');
   if (base) systemText += `=== BASE INSTRUCTIONS ===\n${base}\n\n`;
 
-  // 2. Enhanced Prompt rules (Prompt Enhancer layer might provide instructions on how to interpret)
+  // 4. Enhanced Prompt rules
   const enhancer = getLayerContent('enhancer');
   if (enhancer) systemText += `=== PROMPT ENHANCEMENT RULES ===\n${enhancer}\n\n`;
 
-  // 3. RAG Context
+  // 5. RAG Context
   const rag = getLayerContent('rag');
   if (rag) systemText += `=== KNOWLEDGE BASE (RAG) ===\n${rag}\n\n`;
-
-  // 6. Safety Reinforcement
-  const guardrails = getLayerContent('guardrails');
-  if (guardrails) systemText += `=== SAFETY GUARDRAILS ===\n${guardrails}\n\n`;
 
   if (systemText.trim()) {
     messages.push({ role: 'system', content: systemText.trim() });

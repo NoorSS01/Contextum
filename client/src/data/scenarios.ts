@@ -10,8 +10,8 @@ export const SCENARIOS: ScenarioPreset[] = [
     contextConfig: {
       layers: DEFAULT_LAYERS.map(l => {
         if (l.id === 'persona') return { ...l, enabled: true, content: 'You are a compassionate, empathetic customer support agent. You must remain calm and apologize profusely while maintaining professional boundaries.' };
-        if (l.id === 'rag') return { ...l, enabled: true, content: 'KB: Refund Policy. Double charges are a known glitch occurring between 1st-5th of the month. Always offer an immediate refund and a 10% discount on the next month.' };
-        if (l.id === 'guardrails') return { ...l, enabled: true, content: 'Do NOT promise arbitrary discounts beyond what is in the KB. Do NOT admit legal fault.' };
+        if (l.id === 'rag') return { ...l, enabled: true, content: 'KB: Refund Policy. Double charges are a known billing issue that can occur between the 1st-5th of the month. Always offer an immediate refund for the duplicate charge. Do not mention discounts unless the customer explicitly asks for compensation beyond the refund.' };
+        if (l.id === 'guardrails') return { ...l, enabled: true, content: 'Do NOT offer discounts, credits, coupons, or free service unless the user explicitly asks for compensation beyond the refund. Do NOT admit legal fault.' };
         return l;
       })
     }

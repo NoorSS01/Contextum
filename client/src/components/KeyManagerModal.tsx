@@ -74,64 +74,62 @@ export const KeyManagerModal: React.FC<Props> = ({ isOpen, onClose, onPassphrase
   if (!isOpen) return null;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }}>
-      <div className="glass-panel p-6" style={{ width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-2">
-            <KeyRound className="text-accent-primary" />
+    <div className="modal-backdrop">
+      <div className="modal-shell">
+        <div className="modal-header">
+          <div className="section-title section-title--compact">
+            <KeyRound size={20} />
             <h2>API Key Management</h2>
           </div>
-          <button className="secondary" onClick={onClose} style={{ padding: '0.25rem 0.5rem' }}>
+          <button className="icon-button" onClick={onClose} type="button" title="Close">
             <X size={20} />
           </button>
         </div>
 
         {!passphrase ? (
-          <div className="glass-panel p-4 mb-4">
-            <p className="mb-4" style={{ color: 'var(--text-secondary)' }}>
+          <div className="vault-intro">
+            <p>
               Enter a session passphrase. This encrypts your keys in the browser before storage. 
               You will need this passphrase each time you reload the app.
             </p>
-            <div className="flex gap-2">
+            <div className="vault-row">
               <input 
                 type="password" 
                 placeholder="Session Passphrase" 
                 value={inputPassphrase}
                 onChange={e => setInputPassphrase(e.target.value)}
               />
-              <button className="primary" onClick={handleSetPassphrase}>Unlock</button>
+              <button className="button button--primary" onClick={handleSetPassphrase}>Unlock</button>
             </div>
           </div>
         ) : (
-          <div className="flex-col gap-4">
-            <div className="glass-panel p-4 mb-4" style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.2)' }}>
-              <p style={{ color: 'var(--success)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div className="vault-list">
+            <div className="vault-status">
                 <Check size={16} /> Vault unlocked. Keys are encrypted with AES-256-GCM.
-              </p>
             </div>
 
             {PROVIDERS.map(provider => (
-              <div key={provider.id} className="flex-col gap-2 p-4 mb-2 glass-panel" style={{ background: 'transparent' }}>
-                <div className="flex justify-between items-center">
-                  <h4 style={{ margin: 0 }}>{provider.name}</h4>
+              <div key={provider.id} className="vault-provider">
+                <div className="vault-provider__meta">
+                  <h4>{provider.name}</h4>
                   {keysStatus[provider.id] ? (
-                    <span style={{ color: 'var(--success)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span className="key-status key-status--saved">
                       <Check size={14} /> Key Saved
                     </span>
                   ) : (
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Not configured</span>
+                    <span className="key-status">Not configured</span>
                   )}
                 </div>
                 
-                <div className="flex gap-2 mt-2">
+                <div className="vault-row">
                   <input 
                     type="password" 
-                    placeholder={keysStatus[provider.id] ? "Enter new key to overwrite..." : "sk-..."}
+                    placeholder={keysStatus[provider.id] ? "Enter new key to overwrite" : "Paste API key"}
                     value={newKeyValues[provider.id] || ''}
                     onChange={e => setNewKeyValues({...newKeyValues, [provider.id]: e.target.value})}
                   />
                   <button 
-                    className="primary" 
+                    className="button button--primary" 
                     onClick={() => handleSaveKey(provider.id)}
                     disabled={!newKeyValues[provider.id] || loading}
                   >
@@ -139,11 +137,12 @@ export const KeyManagerModal: React.FC<Props> = ({ isOpen, onClose, onPassphrase
                   </button>
                   {keysStatus[provider.id] && (
                     <button 
-                      className="secondary" 
+                      className="icon-button icon-button--danger" 
                       onClick={() => handleDeleteKey(provider.id)}
-                      title="Delete Key"
+                      title="Delete key"
+                      type="button"
                     >
-                      <Trash2 size={18} style={{ color: 'var(--danger)' }} />
+                      <Trash2 size={18} />
                     </button>
                   )}
                 </div>

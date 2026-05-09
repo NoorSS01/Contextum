@@ -8,10 +8,14 @@ const processes = [
 ];
 
 const children = processes.map(({ name, args }) => {
-  const child = spawn(npmCommand, args, {
-    stdio: 'inherit',
-    shell: false,
-  });
+  const child =
+    process.platform === 'win32'
+      ? spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', [npmCommand, ...args].join(' ')], {
+          stdio: 'inherit',
+        })
+      : spawn(npmCommand, args, {
+          stdio: 'inherit',
+        });
 
   child.on('exit', (code, signal) => {
     if (signal) {
