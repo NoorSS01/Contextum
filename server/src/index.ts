@@ -13,9 +13,12 @@ dotenv.config();
 const app = express();
 const logger = pino({ transport: { target: 'pino-pretty' } });
 
-// Need to allow CORS and parsing JSON
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '256kb' }));
+
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 interface GenerateRequest {
   providerId: ProviderId;
@@ -25,28 +28,32 @@ interface GenerateRequest {
 }
 
 app.post('/api/generate', async (req, res) => {
+  const timeout = setTimeout(() => {
+    if (!res.headersSent) res.status(504).json({ error: 'Generation timed out after 90s.' });
+  }, 90_000);
+
   try {
     const { providerId, prompt, contextConfig, keys } = req.body as GenerateRequest;
 
     if (!providerId || !prompt || !contextConfig) {
+      clearTimeout(timeout);
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    logger.info({ providerId, hasContent: !!contextConfig }, 'Received generation request');
+    logger.info({ providerId }, 'Generate request');
 
     const model = getModel(providerId, keys);
     const messages = buildMessages(prompt, contextConfig);
 
-    const result = await streamText({
-      model,
-      messages,
-      // Calculate token info roughly manually or rely on the metadata if available
-    });
-
+    const result = await streamText({ model, messages });
     result.pipeTextStreamToResponse(res);
-  } catch (error: any) {
-    logger.error(error, 'Generate API error');
-    res.status(500).json({ error: error?.message || 'Generation failed' });
+    await result.text; // wait for stream to finish before clearing timeout
+    clearTimeout(timeout);
+  } catch (error: unknown) {
+    clearTimeout(timeout);
+    const msg = error instanceof Error ? error.message : 'Generation failed';
+    logger.error(error, 'Generate error');
+    if (!res.headersSent) res.status(500).json({ error: msg });
   }
 });
 
@@ -57,23 +64,20 @@ app.post('/api/evaluate', async (req, res) => {
     if (!providerId || !prompt || !responseText || !contextConfig) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
-    
-    // Evaluate using the active provider
+
     const model = getModel(providerId, keys);
     const systemMessages = buildMessages(prompt, contextConfig)
       .filter(m => m.role === 'system')
       .map(m => m.content)
       .join('\n');
 
-    logger.info({ providerId }, 'Starting evaluation');
-    const startTime = Date.now();
+    logger.info({ providerId }, 'Evaluate request');
     const evaluation = await evaluateResponse(model, prompt, responseText, systemMessages);
-    logger.info({ duration: Date.now() - startTime }, 'Evaluation completed');
-
     res.json(evaluation);
-  } catch (error: any) {
-    logger.error(error, 'Evaluate API error');
-    res.status(500).json({ error: error?.message || 'Evaluation failed' });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Evaluation failed';
+    logger.error(error, 'Evaluate error');
+    if (!res.headersSent) res.status(500).json({ error: msg });
   }
 });
 

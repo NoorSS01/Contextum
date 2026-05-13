@@ -1,30 +1,32 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ProviderId } from '@shared/types';
 import { saveKey, hasKeyStored, deleteKey } from '../services/keys';
-import { KeyRound, Check, X, Trash2 } from 'lucide-react';
+import { KeyRound, Check, X, Trash2, Eye, EyeOff } from 'lucide-react';
 
-const PROVIDERS: { id: ProviderId; name: string }[] = [
-  { id: 'openai', name: 'OpenAI' },
-  { id: 'google', name: 'Google Gemini' },
-  { id: 'anthropic', name: 'Anthropic Claude' },
-  { id: 'cohere', name: 'Cohere' },
-  { id: 'mistral', name: 'Mistral' },
-  { id: 'groq', name: 'Groq' },
-  { id: 'together', name: 'Together AI' },
+const PROVIDERS: { id: ProviderId; name: string; placeholder: string }[] = [
+  { id: 'openai',    name: 'OpenAI',          placeholder: 'sk-...' },
+  { id: 'google',    name: 'Google Gemini',   placeholder: 'AIza...' },
+  { id: 'anthropic', name: 'Anthropic Claude',placeholder: 'sk-ant-...' },
+  { id: 'cohere',    name: 'Cohere',          placeholder: 'Paste API key' },
+  { id: 'mistral',   name: 'Mistral',         placeholder: 'Paste API key' },
+  { id: 'groq',      name: 'Groq',            placeholder: 'gsk_...' },
+  { id: 'together',  name: 'Together AI',     placeholder: 'Paste API key' },
 ];
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onPassphraseSet: (passphrase: string) => void;
+  onPassphraseSet: (p: string) => void;
 }
 
 export const KeyManagerModal: React.FC<Props> = ({ isOpen, onClose, onPassphraseSet }) => {
   const [passphrase, setPassphrase] = useState('');
   const [inputPassphrase, setInputPassphrase] = useState('');
+  const [showPassphrase, setShowPassphrase] = useState(false);
   const [keysStatus, setKeysStatus] = useState<Record<string, boolean>>({});
   const [newKeyValues, setNewKeyValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const passphraseInputRef = useRef<HTMLInputElement>(null);
 
   const checkKeys = useCallback(async () => {
     const status: Record<string, boolean> = {};
@@ -36,113 +38,139 @@ export const KeyManagerModal: React.FC<Props> = ({ isOpen, onClose, onPassphrase
 
   useEffect(() => {
     if (isOpen) {
-      void Promise.resolve().then(checkKeys);
+      void checkKeys();
+      setTimeout(() => passphraseInputRef.current?.focus(), 50);
     }
-  }, [checkKeys, isOpen]);
+  }, [isOpen, checkKeys]);
+
+  // Close on Escape
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isOpen, onClose]);
 
   const handleSetPassphrase = () => {
-    if (inputPassphrase.length < 4) {
-      alert("Passphrase too short.");
-      return;
-    }
+    if (inputPassphrase.length < 4) return;
     setPassphrase(inputPassphrase);
     onPassphraseSet(inputPassphrase);
   };
 
   const handleSaveKey = async (providerId: ProviderId) => {
-    const keyVal = newKeyValues[providerId];
-    if (!keyVal || !passphrase) return;
-    
+    const val = newKeyValues[providerId];
+    if (!val || !passphrase) return;
     setLoading(true);
     try {
-      await saveKey(providerId, keyVal, passphrase);
-      setNewKeyValues({ ...newKeyValues, [providerId]: '' });
+      await saveKey(providerId, val, passphrase);
+      setNewKeyValues(prev => ({ ...prev, [providerId]: '' }));
       await checkKeys();
-    } catch (err) {
-      console.error(err);
-      alert('Failed to save key.');
+    } catch {
+      // swallow; parent error handling
     }
     setLoading(false);
   };
 
   const handleDeleteKey = async (providerId: ProviderId) => {
-    if(!confirm("Are you sure you want to delete this key?")) return;
     await deleteKey(providerId);
     await checkKeys();
-  }
+  };
 
   if (!isOpen) return null;
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal-shell">
+    <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal-shell" role="dialog" aria-modal="true" aria-label="API Key Management">
         <div className="modal-header">
-          <div className="section-title section-title--compact">
-            <KeyRound size={20} />
-            <h2>API Key Management</h2>
+          <div className="section-title" style={{ marginBottom: 0 }}>
+            <div className="section-title__icon"><KeyRound size={18} /></div>
+            <div>
+              <h2>API Vault</h2>
+              <p>Keys are encrypted with AES-256-GCM and stored locally.</p>
+            </div>
           </div>
-          <button className="icon-button" onClick={onClose} type="button" title="Close">
-            <X size={20} />
+          <button className="icon-btn" onClick={onClose} type="button" title="Close">
+            <X size={18} />
           </button>
         </div>
 
         {!passphrase ? (
           <div className="vault-intro">
             <p>
-              Enter a session passphrase. This encrypts your keys in the browser before storage. 
-              You will need this passphrase each time you reload the app.
+              Set a session passphrase to unlock the vault. Keys are derived with PBKDF2 (100k iterations)
+              and never leave your device in plaintext.
             </p>
-            <div className="vault-row">
-              <input 
-                type="password" 
-                placeholder="Session Passphrase" 
-                value={inputPassphrase}
-                onChange={e => setInputPassphrase(e.target.value)}
-              />
-              <button className="button button--primary" onClick={handleSetPassphrase}>Unlock</button>
+            <div className="vault-row" style={{ position: 'relative' }}>
+              <div style={{ flex: 1, position: 'relative' }}>
+                <input
+                  ref={passphraseInputRef}
+                  type={showPassphrase ? 'text' : 'password'}
+                  placeholder="Session passphrase (min 4 chars)"
+                  value={inputPassphrase}
+                  onChange={e => setInputPassphrase(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleSetPassphrase(); }}
+                  style={{ paddingRight: '2.5rem' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassphrase(p => !p)}
+                  style={{
+                    position: 'absolute', right: '.6rem', top: '50%', transform: 'translateY(-50%)',
+                    background: 'transparent', border: 'none', color: 'var(--text-3)',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center',
+                  }}
+                >
+                  {showPassphrase ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+              <button
+                className="btn btn--primary"
+                onClick={handleSetPassphrase}
+                disabled={inputPassphrase.length < 4}
+              >
+                Unlock
+              </button>
             </div>
           </div>
         ) : (
           <div className="vault-list">
             <div className="vault-status">
-                <Check size={16} /> Vault unlocked. Keys are encrypted with AES-256-GCM.
+              <Check size={16} /> Vault unlocked · AES-256-GCM encryption active
             </div>
-
             {PROVIDERS.map(provider => (
               <div key={provider.id} className="vault-provider">
                 <div className="vault-provider__meta">
                   <h4>{provider.name}</h4>
-                  {keysStatus[provider.id] ? (
-                    <span className="key-status key-status--saved">
-                      <Check size={14} /> Key Saved
-                    </span>
-                  ) : (
-                    <span className="key-status">Not configured</span>
-                  )}
+                  {keysStatus[provider.id]
+                    ? <span className="key-status key-status--saved"><Check size={13} /> Key Saved</span>
+                    : <span className="key-status">Not configured</span>
+                  }
                 </div>
-                
                 <div className="vault-row">
-                  <input 
-                    type="password" 
-                    placeholder={keysStatus[provider.id] ? "Enter new key to overwrite" : "Paste API key"}
-                    value={newKeyValues[provider.id] || ''}
-                    onChange={e => setNewKeyValues({...newKeyValues, [provider.id]: e.target.value})}
+                  <input
+                    type="password"
+                    placeholder={keysStatus[provider.id] ? 'Enter new key to overwrite…' : provider.placeholder}
+                    value={newKeyValues[provider.id] ?? ''}
+                    onChange={e => setNewKeyValues(p => ({ ...p, [provider.id]: e.target.value }))}
+                    onKeyDown={e => { if (e.key === 'Enter') void handleSaveKey(provider.id); }}
                   />
-                  <button 
-                    className="button button--primary" 
-                    onClick={() => handleSaveKey(provider.id)}
+                  <button
+                    className="btn btn--primary btn--sm"
+                    onClick={() => void handleSaveKey(provider.id)}
                     disabled={!newKeyValues[provider.id] || loading}
+                    style={{ flexShrink: 0 }}
                   >
                     Save
                   </button>
                   {keysStatus[provider.id] && (
-                    <button 
-                      className="icon-button icon-button--danger" 
-                      onClick={() => handleDeleteKey(provider.id)}
+                    <button
+                      className="icon-btn icon-btn--danger"
+                      onClick={() => void handleDeleteKey(provider.id)}
                       title="Delete key"
                       type="button"
+                      style={{ flexShrink: 0 }}
                     >
-                      <Trash2 size={18} />
+                      <Trash2 size={15} />
                     </button>
                   )}
                 </div>

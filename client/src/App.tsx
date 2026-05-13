@@ -1,358 +1,385 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { KeyManagerModal } from './components/KeyManagerModal';
 import { ContextPanel } from './components/ContextPanel';
 import { ProviderSelector } from './components/ProviderSelector';
 import { EvaluationScore } from './components/EvaluationScore';
 import { ComparisonTable } from './components/ComparisonTable';
+import { ScenarioCards } from './components/ScenarioCards';
+import { AssembledContextDrawer } from './components/AssembledContextDrawer';
 import { useContextEngine } from './hooks/useContextEngine';
-import { loadKey } from './services/keys';
-import { ProviderId, EvaluationMetrics, ResponseResult, ScenarioPreset } from '@shared/types';
+import { useGeneration } from './hooks/useGeneration';
+import { useToast } from './components/Toast';
 import { SCENARIOS } from './data/scenarios';
-import { KeyRound, Layers, FlaskConical, Play, StopCircle, BookOpen, Activity, ShieldCheck, Sparkles } from 'lucide-react';
+import { buildContextMessages } from './utils/contextPreview';
+import { formatCost } from './utils/tokenEstimate';
+import {
+  FlaskConical, KeyRound, Layers, Sparkles, Activity,
+  ShieldCheck, Play, StopCircle, Copy, Eye, Clock, Coins, Hash,
+  BookOpen, Loader2,
+} from 'lucide-react';
+import { ProviderId, ScenarioPreset } from '@shared/types';
 
-const API_BASE_URL = '/api';
-
-const parseDataStreamLine = (line: string): string => {
-  if (!line.startsWith('0:')) return '';
-
-  try {
-    const parsed = JSON.parse(line.slice(2));
-    return typeof parsed === 'string' ? parsed : '';
-  } catch {
-    return '';
-  }
-};
-
-const readErrorMessage = async (response: Response): Promise<string> => {
-  const text = await response.text();
-
-  try {
-    const parsed = JSON.parse(text) as { error?: string };
-    return parsed.error || text;
-  } catch {
-    return text;
-  }
-};
+const MAX_PROMPT_CHARS = 4000;
 
 function App() {
+  const { toast } = useToast();
   const [isKeyModalOpen, setKeyModalOpen] = useState(false);
-  const [passphrase, setPassphrase] = useState<string>('');
-  
+  const [passphrase, setPassphrase] = useState('');
+  const [activeScenarioId, setActiveScenarioId] = useState<string | null>(null);
+  const [isContextDrawerOpen, setContextDrawerOpen] = useState(false);
+
   const { layers, toggleLayer, updateLayerContent, getConfig, setLayers } = useContextEngine();
   const [providerId, setProviderId] = useState<ProviderId>('openai');
-  const [prompt, setPrompt] = useState<string>('');
-  
-  const [output, setOutput] = useState<string>('');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isEvaluating, setIsEvaluating] = useState(false);
-  const [metrics, setMetrics] = useState<EvaluationMetrics | null>(null);
-  const [experiments, setExperiments] = useState<ResponseResult[]>([]);
-  
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const [prompt, setPrompt] = useState('');
 
-  const loadScenario = (scenario: ScenarioPreset) => {
+  const {
+    output, isGenerating, isEvaluating, metrics, experiments,
+    lastRunMeta, generate, stop, clearExperiments,
+    assembledMessages, currentContextConfig,
+  } = useGeneration();
+
+  const outputRef = useRef<HTMLDivElement>(null);
+  const promptRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-scroll output to bottom during streaming
+  useEffect(() => {
+    if (isGenerating && outputRef.current) {
+      outputRef.current.scrollTop = outputRef.current.scrollHeight;
+    }
+  }, [output, isGenerating]);
+
+  // Keyboard shortcut: Ctrl/Cmd+Enter to generate
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        // Only if not already generating
+        if (!isGenerating) promptRef.current?.blur();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isGenerating]);
+
+  const handleGenerate = useCallback(async () => {
+    if (isGenerating) return;
+    const result = await generate({
+      providerId,
+      prompt,
+      contextConfig: getConfig(),
+      passphrase,
+      onVaultNeeded: () => setKeyModalOpen(true),
+      onError: (msg) => toast('error', msg),
+    });
+    return result;
+  }, [generate, providerId, prompt, getConfig, passphrase, isGenerating, toast]);
+
+  // Ctrl+Enter handler attached to prompt textarea
+  const handlePromptKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      void handleGenerate();
+    }
+  }, [handleGenerate]);
+
+  const handleCopyOutput = useCallback(() => {
+    if (!output) return;
+    navigator.clipboard.writeText(output)
+      .then(() => toast('success', 'Copied to clipboard.'))
+      .catch(() => toast('error', 'Failed to copy.'));
+  }, [output, toast]);
+
+  const loadScenario = useCallback((scenario: ScenarioPreset) => {
     setPrompt(scenario.prompt);
     setLayers(scenario.contextConfig.layers);
-  };
+    setActiveScenarioId(scenario.id);
+    toast('info', `Loaded: ${scenario.name}`);
+  }, [setLayers, toast]);
 
-  const handleGenerate = async () => {
-    if (!prompt.trim()) {
-      alert("Please enter a prompt.");
-      return;
-    }
+  const previewMessages = isContextDrawerOpen
+    ? buildContextMessages(prompt, getConfig())
+    : assembledMessages;
 
-    const key = passphrase ? await loadKey(providerId, passphrase) : null;
-
-    setOutput('');
-    setMetrics(null);
-    setIsGenerating(true);
-    
-    abortControllerRef.current = new AbortController();
-
-    const startTime = Date.now();
-    const contextConfig = getConfig();
-    let fullText = '';
-    let streamBuffer = '';
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          providerId,
-          prompt,
-          contextConfig,
-          keys: key ? { [providerId]: key } : {}
-        }),
-        signal: abortControllerRef.current.signal
-      });
-
-      if (!response.ok) {
-        const message = await readErrorMessage(response);
-        if (message.toLowerCase().includes('key required')) {
-          setKeyModalOpen(true);
-          throw new Error(
-            `${message}. Add a key in the Vault, or set a matching API key in the server .env file.`
-          );
-        }
-
-        throw new Error(message);
-      }
-
-      if (!response.body) throw new Error('No response body');
-      
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      const isTextStream = response.headers.get('content-type')?.includes('text/plain');
-      
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-
-        if (isTextStream) {
-          fullText += chunk;
-          setOutput(fullText);
-          continue;
-        }
-        
-        streamBuffer += chunk;
-        const lines = streamBuffer.split('\n');
-        streamBuffer = lines.pop() || '';
-        
-        for (const line of lines) {
-          const textChunk = parseDataStreamLine(line);
-          if (!textChunk) continue;
-
-          fullText += textChunk;
-          setOutput(fullText);
-        }
-      }
-
-      const finalChunk = parseDataStreamLine(streamBuffer.trim());
-      if (finalChunk) {
-        fullText += finalChunk;
-        setOutput(fullText);
-      }
-
-      if (!fullText.trim()) {
-        throw new Error(
-          'The provider returned an empty response. Check that the selected model is available for your API key and try again.'
-        );
-      }
-
-      setIsGenerating(false);
-      setIsEvaluating(true);
-      const responseTimeMs = Date.now() - startTime;
-      
-      const evalRes = await fetch(`${API_BASE_URL}/evaluate`, {
-         method: 'POST',
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify({
-           providerId,
-           prompt,
-           responseText: fullText,
-           contextConfig,
-           keys: key ? { [providerId]: key } : {}
-         })
-      });
-      
-      let finalMetrics = null;
-      if (evalRes.ok) {
-        finalMetrics = await evalRes.json();
-        setMetrics(finalMetrics);
-      }
-
-      // Add to experiments log
-      setExperiments(prev => [{
-        id: Math.random().toString(36).substring(7),
-        providerId,
-        prompt,
-        contextConfig,
-        responseText: fullText,
-        responseTimeMs,
-        tokenCount: 0, // Mocked for now
-        estimatedCostCent: 0, // Mocked for now
-        evaluation: finalMetrics,
-        timestamp: new Date().toISOString()
-      }, ...prev]);
-      
-    } catch (error: unknown) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        return;
-      }
-
-      if (error instanceof Error) {
-        console.error(error);
-        alert(`Generation failed: ${error.message}`);
-      } else {
-        console.error(error);
-        alert('Generation failed: Unknown error');
-      }
-    } finally {
-      setIsGenerating(false);
-      setIsEvaluating(false);
-    }
-  };
-
-  const handleStop = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-  };
+  const charOverLimit = prompt.length > MAX_PROMPT_CHARS;
+  const activeLayers = layers.filter(l => l.enabled).length;
+  const isBusy = isGenerating || isEvaluating;
 
   return (
     <div className="app-shell">
+      {/* ── Topbar ── */}
       <header className="topbar">
         <div className="topbar__brand">
           <div className="brand-mark">
-            <FlaskConical size={22} />
+            <FlaskConical size={20} />
           </div>
           <div>
-            <h1>Contextum</h1>
-            <p>Context engineering lab</p>
+            <div className="brand-name">Contextum</div>
+            <div className="brand-sub">Context engineering lab</div>
           </div>
         </div>
 
+        <div className="topbar__center">
+          {isBusy && (
+            <div className="topbar-status">
+              <Loader2 size={14} className="spin" />
+              <span>{isGenerating ? 'Generating…' : 'Evaluating…'}</span>
+            </div>
+          )}
+        </div>
+
         <div className="topbar__actions">
-            <ProviderSelector selectedId={providerId} onSelect={setProviderId} />
-          <button className={passphrase ? 'button button--success' : 'button button--secondary'} onClick={() => setKeyModalOpen(true)}>
-              <KeyRound size={18} />
-            Vault {passphrase ? 'Unlocked' : 'Locked'}
-            </button>
-          </div>
+          <ProviderSelector selectedId={providerId} onSelect={setProviderId} />
+          <div className="topbar-divider" />
+          <button
+            className="btn btn--ghost btn--sm"
+            onClick={() => setContextDrawerOpen(true)}
+            title="Inspect assembled context"
+          >
+            <Eye size={15} /> Context
+          </button>
+          <button
+            className={passphrase ? 'btn btn--success btn--sm' : 'btn btn--secondary btn--sm'}
+            onClick={() => setKeyModalOpen(true)}
+          >
+            <KeyRound size={15} />
+            {passphrase ? 'Vault ✓' : 'Vault'}
+          </button>
+        </div>
       </header>
 
+      {/* ── Main ── */}
       <main className="app-main">
-        <section className="hero-band">
+
+        {/* Hero */}
+        <div className="hero-band">
           <div>
-            <p className="eyebrow"><Sparkles size={14} /> Experiment Workbench</p>
-            <h2>Build, test, and score context layers with a cleaner signal path.</h2>
+            <p className="eyebrow"><Sparkles size={13} /> Experiment Workbench</p>
+            <h2>Build, test &amp; score context layers<br />with a cleaner signal path.</h2>
           </div>
           <div className="status-strip">
             <div className="status-pill">
-              <Activity size={16} />
-              <span>{experiments.length} runs</span>
-              </div>
+              <Activity size={14} />
+              <span>{experiments.length} run{experiments.length !== 1 ? 's' : ''}</span>
+            </div>
             <div className="status-pill">
-              <ShieldCheck size={16} />
-              <span>{layers.filter(layer => layer.enabled).length} active layers</span>
+              <ShieldCheck size={14} />
+              <span>{activeLayers} active layer{activeLayers !== 1 ? 's' : ''}</span>
             </div>
           </div>
-        </section>
+        </div>
 
-        <section className="preset-bar">
-          <div className="section-title section-title--compact">
-            <BookOpen size={18} />
-            <div>
-              <h2>Scenario Preset</h2>
-              <p>Load a ready-made context stack, then edit the layers below.</p>
-            </div>
+        {/* Scenarios */}
+        <section className="scenario-section panel">
+          <div className="section-label">
+            <BookOpen size={15} />
+            <span>Scenario Presets</span>
+            <span className="section-label__sub">— load a ready-made context stack to explore</span>
           </div>
-          <select
-            className="preset-select"
-            onChange={e => {
-                const s = SCENARIOS.find(x => x.id === e.target.value);
-                if (s) loadScenario(s);
-            }}
-            defaultValue=""
-          >
-                <option value="" disabled>Select preset</option>
-                {SCENARIOS.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+          <ScenarioCards
+            scenarios={SCENARIOS}
+            activeScenarioId={activeScenarioId}
+            onSelect={loadScenario}
+          />
         </section>
 
-        <section className="workspace-grid">
-          <div className="workspace-column">
+        {/* Workspace */}
+        <div className="workspace-grid">
+          {/* Left col */}
+          <div className="workspace-col">
             <section className="panel">
               <div className="section-title">
-                <Layers size={20} />
+                <div className="section-title__icon"><Layers size={18} /></div>
                 <div>
                   <h2>Context Layers</h2>
-                  <p>Control exactly what gets sent to the model.</p>
+                  <p>Toggle and edit what gets sent to the model.</p>
                 </div>
               </div>
-
-              <ContextPanel 
-                layers={layers} 
-                onToggle={toggleLayer} 
-                onUpdateContent={updateLayerContent} 
+              <ContextPanel
+                layers={layers}
+                onToggle={toggleLayer}
+                onUpdateContent={updateLayerContent}
               />
             </section>
 
             <section className="panel prompt-panel">
               <div className="section-title">
-                <Sparkles size={20} />
+                <div className="section-title__icon"><Sparkles size={18} /></div>
                 <div>
                   <h2>User Prompt</h2>
-                  <p>The live prompt tested against the selected context stack.</p>
+                  <p>
+                    <kbd className="kbd">Ctrl+Enter</kbd> to generate
+                  </p>
                 </div>
               </div>
-              <textarea 
-                placeholder="Enter your prompt here..." 
-                rows={5} 
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
+              <textarea
+                ref={promptRef}
                 className="prompt-input"
+                placeholder="Enter your prompt here…"
+                rows={5}
+                value={prompt}
+                onChange={e => setPrompt(e.target.value)}
+                onKeyDown={handlePromptKeyDown}
+                aria-label="User prompt"
               />
-              <div className="prompt-actions">
-                {!isGenerating ? (
-                  <button className="button button--primary" onClick={handleGenerate}>
-                    <Play size={18} /> Generate Response
-                  </button>
-                ) : (
-                  <button className="button button--danger" onClick={handleStop}>
-                    <StopCircle size={18} /> Stop Generation
-                  </button>
-                )}
+              <div className="prompt-meta">
+                <span className={`char-count${charOverLimit ? ' char-count--warn' : ''}`}>
+                  {prompt.length.toLocaleString()} / {MAX_PROMPT_CHARS.toLocaleString()}
+                </span>
+                <div className="prompt-actions">
+                  {isGenerating ? (
+                    <button className="btn btn--danger btn--sm" onClick={stop}>
+                      <StopCircle size={15} /> Stop
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn--primary"
+                      onClick={() => void handleGenerate()}
+                      disabled={!prompt.trim() || charOverLimit}
+                    >
+                      <Play size={15} /> Generate
+                    </button>
+                  )}
+                </div>
               </div>
             </section>
           </div>
 
-          <div className="workspace-column workspace-column--sticky">
-            <section className="panel output-panel">
-              <div className="section-title">
-                <Activity size={20} />
-                <div>
+          {/* Right col */}
+          <div className="workspace-col workspace-col--sticky">
+            <section className="panel">
+              <div className="section-title" style={{ marginBottom: '.75rem' }}>
+                <div className="section-title__icon"><Activity size={18} /></div>
+                <div style={{ flex: 1 }}>
                   <h2>Engine Output</h2>
-                  <p>Streaming model response from the active provider.</p>
+                  <p>Live streaming · {isGenerating ? <span className="streaming-label">streaming</span> : 'idle'}</p>
                 </div>
+                {output && !isGenerating && (
+                  <button
+                    className="icon-btn"
+                    style={{ width: 30, height: 30, marginLeft: 'auto' }}
+                    onClick={handleCopyOutput}
+                    title="Copy output"
+                  >
+                    <Copy size={13} />
+                  </button>
+                )}
               </div>
-              <div className="output-box">
-                {output ? output : <span>Awaiting generation...</span>}
+
+              <div
+                ref={outputRef}
+                className={`output-box${isGenerating ? ' output-box--streaming' : ''}`}
+              >
+                {output ? (
+                  <>
+                    <OutputRenderer text={output} />
+                    {isGenerating && <span className="cursor-blink" />}
+                  </>
+                ) : (
+                  <div className="output-empty-state">
+                    <div className="output-empty-icon">
+                      <Activity size={28} />
+                    </div>
+                    <p>{isGenerating ? 'Waiting for first token…' : 'Awaiting generation…'}</p>
+                    {!isGenerating && <p className="output-empty-hint">Configure layers, enter a prompt, press Generate.</p>}
+                  </div>
+                )}
               </div>
+
+              {lastRunMeta && (
+                <div className="output-meta">
+                  <span className="meta-chip"><Clock size={12} /><strong>{lastRunMeta.latencyMs.toLocaleString()}ms</strong></span>
+                  <span className="meta-chip"><Hash size={12} /><strong>~{(lastRunMeta.promptTokens + lastRunMeta.completionTokens).toLocaleString()}</strong> tokens</span>
+                  <span className="meta-chip"><Coins size={12} /><strong>{formatCost(lastRunMeta.costUSD)}</strong></span>
+                </div>
+              )}
             </section>
 
             <section className="panel">
               <div className="section-title">
-                <ShieldCheck size={20} />
+                <div className="section-title__icon"><ShieldCheck size={18} /></div>
                 <div>
                   <h2>Evaluation Engine</h2>
-                  <p>Strict judge scores context adherence and response quality.</p>
+                  <p>AI-estimated quality · not ground truth</p>
                 </div>
               </div>
-              {(isEvaluating || metrics) ? (
-                <EvaluationScore metrics={metrics} loading={isEvaluating} />
-              ) : (
-                <div className="empty-state">
-                  Run a generation to evaluate context quality.
-                </div>
-              )}
+              <EvaluationScore metrics={metrics} loading={isEvaluating} />
             </section>
           </div>
-        </section>
+        </div>
 
-        <ComparisonTable experiments={experiments} />
+        {/* Comparison table */}
+        <ComparisonTable experiments={experiments} onClear={clearExperiments} />
       </main>
 
-      <KeyManagerModal 
-        isOpen={isKeyModalOpen} 
-        onClose={() => setKeyModalOpen(false)} 
+      <KeyManagerModal
+        isOpen={isKeyModalOpen}
+        onClose={() => setKeyModalOpen(false)}
         onPassphraseSet={setPassphrase}
+      />
+      <AssembledContextDrawer
+        isOpen={isContextDrawerOpen}
+        onClose={() => setContextDrawerOpen(false)}
+        contextConfig={currentContextConfig ?? getConfig()}
+        assembledMessages={previewMessages}
       />
     </div>
   );
+}
+
+/** Lightweight markdown-lite renderer — handles code blocks, bold, inline code */
+function OutputRenderer({ text }: { text: string }) {
+  const lines = text.split('\n');
+  const elements: React.ReactNode[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Fenced code block
+    if (line.startsWith('```')) {
+      const lang = line.slice(3).trim();
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].startsWith('```')) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      elements.push(
+        <div key={i} className="output-code-block">
+          {lang && <span className="output-code-lang">{lang}</span>}
+          <pre><code>{codeLines.join('\n')}</code></pre>
+        </div>
+      );
+    } else if (line.startsWith('# ')) {
+      elements.push(<p key={i} className="output-h1">{line.slice(2)}</p>);
+    } else if (line.startsWith('## ')) {
+      elements.push(<p key={i} className="output-h2">{line.slice(3)}</p>);
+    } else if (line.startsWith('### ')) {
+      elements.push(<p key={i} className="output-h3">{line.slice(4)}</p>);
+    } else if (line.startsWith('- ') || line.startsWith('* ')) {
+      elements.push(<div key={i} className="output-li"><span className="output-li-dot">·</span><span>{renderInline(line.slice(2))}</span></div>);
+    } else if (line === '') {
+      elements.push(<div key={i} className="output-spacer" />);
+    } else {
+      elements.push(<p key={i} className="output-p">{renderInline(line)}</p>);
+    }
+    i++;
+  }
+
+  return <div className="output-content">{elements}</div>;
+}
+
+function renderInline(text: string): React.ReactNode {
+  // Handle **bold** and `code` inline
+  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith('`') && part.endsWith('`')) {
+      return <code key={i} className="output-inline-code">{part.slice(1, -1)}</code>;
+    }
+    return part;
+  });
 }
 
 export default App;

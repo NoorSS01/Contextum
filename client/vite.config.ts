@@ -5,16 +5,18 @@ import { fileURLToPath, URL } from 'url';
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  cacheDir: './.tmp/vite',
-  server: {
-    proxy: {
-      '/api': 'http://localhost:3001',
-    },
-  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
       '@shared': fileURLToPath(new URL('../shared', import.meta.url))
+    }
+  },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      }
     }
   }
 })
