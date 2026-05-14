@@ -142,10 +142,14 @@ export const useGeneration = (): UseGenerationResult => {
         streamBuffer += chunk;
         const lines = streamBuffer.split('\n');
         streamBuffer = lines.pop() ?? '';
+        let hasUpdates = false;
         for (const line of lines) {
           const text = parseDataStreamLine(line);
           if (!text) continue;
           fullText += text;
+          hasUpdates = true;
+        }
+        if (hasUpdates) {
           setState(prev => ({ ...prev, output: fullText }));
         }
       }
