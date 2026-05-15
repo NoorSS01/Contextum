@@ -40,14 +40,14 @@ export const ContextPanel: React.FC<Props> = ({ layers, onToggle, onUpdateConten
                 onClick={() => toggle(layer.id)}
                 type="button"
                 aria-expanded={isOpen}
-                aria-label={`${layer.name} — ${layer.enabled ? 'active' : 'inactive'}`}
+                aria-label={`${layer.name} - ${layer.enabled ? 'active' : 'inactive'}`}
               >
                 <span className="context-layer__name" style={{ color: layer.enabled ? meta?.color : undefined }}>
                   <span className="layer-icon">{meta?.icon}</span>
                   {layer.name}
                 </span>
                 <span className="context-layer__meta">
-                  {layer.enabled ? 'Active' : 'Inactive'} · {layer.content.length.toLocaleString()} chars
+                  {layer.enabled ? 'Active' : 'Inactive'} - {layer.content.length.toLocaleString()} chars
                 </span>
               </button>
 
@@ -83,7 +83,7 @@ export const ContextPanel: React.FC<Props> = ({ layers, onToggle, onUpdateConten
                   onChange={e => onUpdateContent(layer.id, e.target.value)}
                   rows={5}
                   spellCheck={false}
-                  placeholder={`Enter ${layer.name} content…`}
+                  placeholder={`Enter ${layer.name} content...`}
                   aria-label={`${layer.name} content`}
                 />
               </div>

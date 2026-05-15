@@ -105,7 +105,7 @@ function App() {
 
   return (
     <div className="app-shell">
-      {/* ── Topbar ── */}
+      {/* Topbar */}
       <header className="topbar">
         <div className="topbar__brand">
           <div className="brand-mark">
@@ -121,7 +121,7 @@ function App() {
           {isBusy && (
             <div className="topbar-status">
               <Loader2 size={14} className="spin" />
-              <span>{isGenerating ? 'Generating…' : 'Evaluating…'}</span>
+              <span>{isGenerating ? 'Generating...' : 'Evaluating...'}</span>
             </div>
           )}
         </div>
@@ -141,19 +141,19 @@ function App() {
             onClick={() => setKeyModalOpen(true)}
           >
             <KeyRound size={15} />
-            {passphrase ? 'Vault ✓' : 'Vault'}
+            {passphrase ? 'Vault saved' : 'Vault'}
           </button>
         </div>
       </header>
 
-      {/* ── Main ── */}
+      {/* Main */}
       <main className="app-main">
 
         {/* Hero */}
         <div className="hero-band">
           <div>
             <p className="eyebrow"><Sparkles size={13} /> Experiment Workbench</p>
-            <h2>Build, test &amp; score context layers<br />with a cleaner signal path.</h2>
+            <h2>Design, test, and score context layers with a cleaner signal path.</h2>
           </div>
           <div className="status-strip">
             <div className="status-pill">
@@ -172,7 +172,7 @@ function App() {
           <div className="section-label">
             <BookOpen size={15} />
             <span>Scenario Presets</span>
-            <span className="section-label__sub">— load a ready-made context stack to explore</span>
+            <span className="section-label__sub">Load a ready-made context stack to explore</span>
           </div>
           <ScenarioCards
             scenarios={SCENARIOS}
@@ -213,7 +213,7 @@ function App() {
               <textarea
                 ref={promptRef}
                 className="prompt-input"
-                placeholder="Enter your prompt here…"
+                placeholder="Enter your prompt here..."
                 rows={5}
                 value={prompt}
                 onChange={e => setPrompt(e.target.value)}
@@ -250,7 +250,7 @@ function App() {
                 <div className="section-title__icon"><Activity size={18} /></div>
                 <div style={{ flex: 1 }}>
                   <h2>Engine Output</h2>
-                  <p>Live streaming · {isGenerating ? <span className="streaming-label">streaming</span> : 'idle'}</p>
+                  <p>Live streaming - {isGenerating ? <span className="streaming-label">streaming</span> : 'idle'}</p>
                 </div>
                 {output && !isGenerating && (
                   <button
@@ -278,7 +278,7 @@ function App() {
                     <div className="output-empty-icon">
                       <Activity size={28} />
                     </div>
-                    <p>{isGenerating ? 'Waiting for first token…' : 'Awaiting generation…'}</p>
+                    <p>{isGenerating ? 'Waiting for first token...' : 'Awaiting generation...'}</p>
                     {!isGenerating && <p className="output-empty-hint">Configure layers, enter a prompt, press Generate.</p>}
                   </div>
                 )}
@@ -325,7 +325,7 @@ function App() {
   );
 }
 
-/** Lightweight markdown-lite renderer — handles code blocks, bold, inline code */
+/** Lightweight markdown-lite renderer: handles code blocks, bold, inline code */
 function OutputRenderer({ text }: { text: string }) {
   const lines = text.split('\n');
   const elements: React.ReactNode[] = [];
@@ -356,7 +356,7 @@ function OutputRenderer({ text }: { text: string }) {
     } else if (line.startsWith('### ')) {
       elements.push(<p key={i} className="output-h3">{line.slice(4)}</p>);
     } else if (line.startsWith('- ') || line.startsWith('* ')) {
-      elements.push(<div key={i} className="output-li"><span className="output-li-dot">·</span><span>{renderInline(line.slice(2))}</span></div>);
+      elements.push(<div key={i} className="output-li"><span className="output-li-dot" /><span>{renderInline(line.slice(2))}</span></div>);
     } else if (line === '') {
       elements.push(<div key={i} className="output-spacer" />);
     } else {

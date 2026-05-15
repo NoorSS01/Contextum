@@ -33,11 +33,7 @@ interface Props {
 
 export const ScenarioCards: React.FC<Props> = ({ scenarios, activeScenarioId, onSelect }) => {
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-      gap: '0.65rem',
-    }}>
+    <div className="scenario-grid">
       {scenarios.map(scenario => {
         const meta = SCENARIO_META[scenario.id];
         const isActive = activeScenarioId === scenario.id;
@@ -47,51 +43,20 @@ export const ScenarioCards: React.FC<Props> = ({ scenarios, activeScenarioId, on
             key={scenario.id}
             onClick={() => onSelect(scenario)}
             type="button"
+            className={`scenario-card${isActive ? ' scenario-card--active' : ''}`}
             style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'flex-start',
-              gap: '0.5rem',
-              padding: '0.875rem 1rem',
-              background: isActive ? meta?.gradient ?? 'rgba(56,189,248,0.08)' : 'rgba(255,255,255,0.028)',
-              border: `1px solid ${isActive ? (meta?.accent ?? '#38bdf8') + '55' : 'rgba(148,163,184,0.14)'}`,
-              borderRadius: '10px',
-              cursor: 'pointer',
-              textAlign: 'left',
-              transition: 'all 0.2s ease',
-              color: '#f8fafc',
-              outline: isActive ? `2px solid ${meta?.accent ?? '#38bdf8'}40` : 'none',
-              outlineOffset: '2px',
-            }}
-            onMouseEnter={e => {
-              if (!isActive) {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.055)';
-                e.currentTarget.style.borderColor = 'rgba(148,163,184,0.28)';
-              }
-            }}
-            onMouseLeave={e => {
-              if (!isActive) {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.028)';
-                e.currentTarget.style.borderColor = 'rgba(148,163,184,0.14)';
-              }
-            }}
+              '--scenario-accent': meta?.accent ?? '#38bdf8',
+              '--scenario-bg': meta?.gradient ?? 'rgba(56,189,248,0.08)',
+            } as React.CSSProperties}
           >
-            <div style={{
-              width: '32px', height: '32px',
-              display: 'grid', placeItems: 'center',
-              borderRadius: '8px',
-              background: `${meta?.accent ?? '#38bdf8'}18`,
-              border: `1px solid ${meta?.accent ?? '#38bdf8'}30`,
-              color: meta?.accent ?? '#38bdf8',
-              flexShrink: 0,
-            }}>
+            <div className="scenario-card__icon">
               {meta?.icon}
             </div>
-            <div>
-              <div style={{ fontSize: '0.875rem', fontWeight: 700, marginBottom: '0.2rem' }}>
+            <div className="scenario-card__body">
+              <div className="scenario-card__title">
                 {scenario.name}
               </div>
-              <div style={{ fontSize: '0.75rem', color: '#64748b', lineHeight: 1.4 }}>
+              <div className="scenario-card__description">
                 {scenario.description}
               </div>
             </div>
