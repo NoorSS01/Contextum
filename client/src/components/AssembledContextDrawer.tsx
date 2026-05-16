@@ -113,7 +113,7 @@ export const AssembledContextDrawer: React.FC<Props> = ({
             <div>
               <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>Assembled Context</h3>
               <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>
-                {enabledLayers.length} active layers · {assembledMessages.length} messages
+                {enabledLayers.length} active layers - {assembledMessages.length} messages
               </p>
             </div>
           </div>

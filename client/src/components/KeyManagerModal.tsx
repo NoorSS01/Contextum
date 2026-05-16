@@ -38,6 +38,7 @@ export const KeyManagerModal: React.FC<Props> = ({ isOpen, onClose, onPassphrase
 
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       void checkKeys();
       setTimeout(() => passphraseInputRef.current?.focus(), 50);
     }
@@ -135,7 +136,7 @@ export const KeyManagerModal: React.FC<Props> = ({ isOpen, onClose, onPassphrase
         ) : (
           <div className="vault-list">
             <div className="vault-status">
-              <Check size={16} /> Vault unlocked · AES-256-GCM encryption active
+              <Check size={16} /> Vault unlocked - AES-256-GCM encryption active
             </div>
             {PROVIDERS.map(provider => (
               <div key={provider.id} className="vault-provider">
@@ -149,7 +150,7 @@ export const KeyManagerModal: React.FC<Props> = ({ isOpen, onClose, onPassphrase
                 <div className="vault-row">
                   <input
                     type="password"
-                    placeholder={keysStatus[provider.id] ? 'Enter new key to overwrite…' : provider.placeholder}
+                    placeholder={keysStatus[provider.id] ? 'Enter new key to overwrite...' : provider.placeholder}
                     value={newKeyValues[provider.id] ?? ''}
                     onChange={e => setNewKeyValues(p => ({ ...p, [provider.id]: e.target.value }))}
                     onKeyDown={e => { if (e.key === 'Enter') void handleSaveKey(provider.id); }}

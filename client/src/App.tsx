@@ -298,7 +298,7 @@ function App() {
                 <div className="section-title__icon"><ShieldCheck size={18} /></div>
                 <div>
                   <h2>Evaluation Engine</h2>
-                  <p>AI-estimated quality · not ground truth</p>
+                  <p>AI-estimated quality - not ground truth</p>
                 </div>
               </div>
               <EvaluationScore metrics={metrics} loading={isEvaluating} />

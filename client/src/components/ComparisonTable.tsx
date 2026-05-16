@@ -73,7 +73,7 @@ export const ComparisonTable: React.FC<Props> = ({ experiments, onClear }) => {
                   </td>
                   <td>
                     <div className="response-excerpt">
-                      {exp.responseText.substring(0, 140)}…
+                      {exp.responseText.substring(0, 140)}...
                     </div>
                   </td>
                   <td style={{ whiteSpace: 'nowrap' }}>{exp.responseTimeMs.toLocaleString()}ms</td>
@@ -84,10 +84,10 @@ export const ComparisonTable: React.FC<Props> = ({ experiments, onClear }) => {
                     {exp.evaluation ? (
                       <div className="table-score">
                         <strong style={{ color: scoreColor }}>{exp.evaluation.overall}</strong>
-                        <span>Rel {exp.evaluation.relevance} · Adr {exp.evaluation.instructionAdherence}</span>
+                        <span>Rel {exp.evaluation.relevance} - Adr {exp.evaluation.instructionAdherence}</span>
                       </div>
                     ) : (
-                      <span style={{ color: 'var(--text-3)', fontStyle: 'italic', fontSize: '.75rem' }}>—</span>
+                      <span style={{ color: 'var(--text-3)', fontStyle: 'italic', fontSize: '.75rem' }}>-</span>
                     )}
                   </td>
                 </tr>

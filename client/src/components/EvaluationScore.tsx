@@ -24,7 +24,7 @@ export const EvaluationScore: React.FC<Props> = ({ metrics, loading }) => {
           <div key={i} className="skeleton-bar" style={{ width: `${w}%` }} />
         ))}
         <p style={{ textAlign: 'center', color: 'var(--text-3)', fontSize: '.78rem', marginTop: '.25rem' }}>
-          Evaluating response…
+          Evaluating response...
         </p>
       </div>
     );
