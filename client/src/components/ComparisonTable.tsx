@@ -27,7 +27,7 @@ export const ComparisonTable: React.FC<Props> = ({ experiments, onClear }) => {
           <div className="section-title__icon"><BarChart3 size={18} /></div>
           <div>
             <h2>Comparative Analysis</h2>
-            <p>{experiments.length} run{experiments.length !== 1 ? 's' : ''} recorded this session</p>
+            <p>{experiments.length} run{experiments.length !== 1 ? 's' : ''} saved locally</p>
           </div>
         </div>
         <button className="btn btn--ghost btn--sm" onClick={onClear} title="Clear all runs">

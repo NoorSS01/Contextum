@@ -79,7 +79,7 @@ npm.cmd run build
 - **7 provider support:** OpenAI, Google Gemini, Anthropic Claude, Cohere, Mistral, Groq, Together.
 - **Dynamic context builder:** 6 configurable layers, including persona, base instructions, prompt enhancer, RAG context, history, and guardrails.
 - **LLM-as-judge evaluation:** Rates relevance, coherence, completeness, hallucination risk, instruction adherence, and overall quality.
-- **Comparative analysis:** Keeps a side-by-side experiment history with response excerpts and scores.
+- **Persistent comparative analysis:** Keeps a local experiment history with response excerpts, scores, latency, token estimates, and cost estimates across page refreshes.
 - **Local-first vault:** AES-GCM encrypted API key manager stored in the browser via `idb`.
 ## Development Notes
 

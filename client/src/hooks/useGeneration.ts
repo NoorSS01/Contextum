@@ -1,10 +1,12 @@
-import { useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { ProviderId, ContextConfig, EvaluationMetrics, ResponseResult } from '@shared/types';
 import { loadKey } from '../services/keys';
 import { buildContextMessages } from '../utils/contextPreview';
 import { estimateTokens, estimateCostUSD } from '../utils/tokenEstimate';
 
 const API_BASE = '/api';
+const EXPERIMENT_HISTORY_KEY = 'contextum:experiment-history';
+const MAX_PERSISTED_EXPERIMENTS = 50;
 
 const parseDataStreamLine = (line: string): string => {
   if (!line.startsWith('0:')) return '';
@@ -40,13 +42,60 @@ interface UseGenerationResult extends GenerationState {
   currentContextConfig: ContextConfig | null;
 }
 
+const isResponseResult = (value: unknown): value is ResponseResult => {
+  if (!value || typeof value !== 'object') return false;
+
+  const result = value as Partial<ResponseResult>;
+  return (
+    typeof result.id === 'string' &&
+    typeof result.providerId === 'string' &&
+    typeof result.prompt === 'string' &&
+    typeof result.responseText === 'string' &&
+    typeof result.responseTimeMs === 'number' &&
+    typeof result.tokenCount === 'number' &&
+    typeof result.estimatedCostCent === 'number' &&
+    typeof result.timestamp === 'string' &&
+    !!result.contextConfig &&
+    Array.isArray(result.contextConfig.layers)
+  );
+};
+
+const loadPersistedExperiments = (): ResponseResult[] => {
+  if (typeof window === 'undefined') return [];
+
+  try {
+    const raw = window.localStorage.getItem(EXPERIMENT_HISTORY_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.filter(isResponseResult).slice(0, MAX_PERSISTED_EXPERIMENTS);
+  } catch {
+    return [];
+  }
+};
+
+const savePersistedExperiments = (experiments: ResponseResult[]) => {
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.localStorage.setItem(
+      EXPERIMENT_HISTORY_KEY,
+      JSON.stringify(experiments.slice(0, MAX_PERSISTED_EXPERIMENTS))
+    );
+  } catch {
+    // Persistence is best-effort; generation should continue if storage is full or unavailable.
+  }
+};
+
 export const useGeneration = (): UseGenerationResult => {
   const [state, setState] = useState<GenerationState>({
     output: '',
     isGenerating: false,
     isEvaluating: false,
     metrics: null,
-    experiments: [],
+    experiments: loadPersistedExperiments(),
     lastRunMeta: null,
   });
   const [assembledMessages, setAssembledMessages] = useState<{ role: string; content: string }[]>([]);
@@ -59,7 +108,16 @@ export const useGeneration = (): UseGenerationResult => {
 
   const clearExperiments = useCallback(() => {
     setState(prev => ({ ...prev, experiments: [] }));
+    try {
+      window.localStorage.removeItem(EXPERIMENT_HISTORY_KEY);
+    } catch {
+      // Ignore localStorage failures.
+    }
   }, []);
+
+  useEffect(() => {
+    savePersistedExperiments(state.experiments);
+  }, [state.experiments]);
 
   const generate = useCallback(async ({
     providerId,
@@ -214,7 +272,7 @@ export const useGeneration = (): UseGenerationResult => {
             timestamp: new Date().toISOString(),
           },
           ...prev.experiments,
-        ],
+        ].slice(0, MAX_PERSISTED_EXPERIMENTS),
       }));
     } catch (error: unknown) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
