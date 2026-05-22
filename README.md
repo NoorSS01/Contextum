@@ -74,3 +74,25 @@ npm.cmd run build
 - Provider keys are read from the browser vault first, then from server environment variables.
 - Server builds clean `dist/` before compiling to avoid stale output.
 
+## Features
+
+- **7 provider support:** OpenAI, Google Gemini, Anthropic Claude, Cohere, Mistral, Groq, Together.
+- **Dynamic context builder:** 6 configurable layers, including persona, base instructions, prompt enhancer, RAG context, history, and guardrails.
+- **LLM-as-judge evaluation:** Rates relevance, coherence, completeness, hallucination risk, instruction adherence, and overall quality.
+- **Persistent comparative analysis:** Keeps a local experiment history with response excerpts, scores, latency, token estimates, and cost estimates across page refreshes.
+- **Local-first vault:** AES-GCM encrypted API key manager stored in the browser via `idb`.
+## Development Notes
+
+- The root `dev` script starts both Vite and Express through a cross-platform Node runner.
+- The Vite dev server proxies `/api/*` requests to `http://localhost:3001`, so frontend code can call relative API paths.
+- The server uses AI SDK v6 streaming and exposes `/api/generate` and `/api/evaluate`.
+- Provider keys are read from the browser vault first, then from server environment variables.
+- Server builds clean `dist/` before compiling to avoid stale output.
+
+## Features
+
+- **7 provider support:** OpenAI, Google Gemini, Anthropic Claude, Cohere, Mistral, Groq, Together.
+- **Dynamic context builder:** 6 configurable layers, including persona, base instructions, prompt enhancer, RAG context, history, and guardrails.
+- **LLM-as-judge evaluation:** Rates relevance, coherence, completeness, hallucination risk, instruction adherence, and overall quality.
+- **Comparative analysis:** Keeps a side-by-side experiment history with response excerpts and scores.
+- **Local-first vault:** AES-GCM encrypted API key manager stored in the browser via `idb`.
