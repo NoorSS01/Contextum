@@ -6,7 +6,7 @@ import { EvaluationScore } from './components/EvaluationScore';
 import { ComparisonTable } from './components/ComparisonTable';
 import { ScenarioCards } from './components/ScenarioCards';
 import { AssembledContextDrawer } from './components/AssembledContextDrawer';
-import { useContextEngine } from './hooks/useContextEngine';
+import { DEFAULT_LAYERS, useContextEngine } from './hooks/useContextEngine';
 import { useGeneration } from './hooks/useGeneration';
 import { useToast } from './components/Toast';
 import { SCENARIOS } from './data/scenarios';
@@ -15,22 +15,63 @@ import { formatCost } from './utils/tokenEstimate';
 import {
   FlaskConical, KeyRound, Layers, Sparkles, Activity,
   ShieldCheck, Play, StopCircle, Copy, Eye, Clock, Coins, Hash,
-  BookOpen, Loader2,
+  BookOpen, Loader2, RotateCcw,
 } from 'lucide-react';
-import { ProviderId, ScenarioPreset } from '@shared/types';
+import type { ContextLayer, ProviderId, ScenarioPreset } from '@shared/types';
 
 const MAX_PROMPT_CHARS = 4000;
+const WORKSPACE_DRAFT_KEY = 'contextum:workspace-draft';
+const PROVIDER_IDS: ProviderId[] = ['openai', 'google', 'anthropic', 'cohere', 'mistral', 'groq', 'together'];
+
+interface WorkspaceDraft {
+  prompt: string;
+  providerId: ProviderId;
+  activeScenarioId: string | null;
+  layers: ContextLayer[];
+}
+
+const isWorkspaceDraft = (value: unknown): value is WorkspaceDraft => {
+  if (!value || typeof value !== 'object') return false;
+
+  const draft = value as Partial<WorkspaceDraft>;
+  return (
+    typeof draft.prompt === 'string' &&
+    typeof draft.providerId === 'string' &&
+    PROVIDER_IDS.includes(draft.providerId as ProviderId) &&
+    (draft.activeScenarioId === null || typeof draft.activeScenarioId === 'string') &&
+    Array.isArray(draft.layers)
+  );
+};
+
+const loadWorkspaceDraft = (): WorkspaceDraft | null => {
+  try {
+    const raw = window.localStorage.getItem(WORKSPACE_DRAFT_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as unknown;
+    return isWorkspaceDraft(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
 
 function App() {
   const { toast } = useToast();
+  const [initialDraft] = useState<WorkspaceDraft | null>(() => loadWorkspaceDraft());
   const [isKeyModalOpen, setKeyModalOpen] = useState(false);
   const [passphrase, setPassphrase] = useState('');
-  const [activeScenarioId, setActiveScenarioId] = useState<string | null>(null);
+  const [activeScenarioId, setActiveScenarioId] = useState<string | null>(
+    initialDraft?.activeScenarioId ?? null
+  );
   const [isContextDrawerOpen, setContextDrawerOpen] = useState(false);
 
-  const { layers, toggleLayer, updateLayerContent, getConfig, setLayers } = useContextEngine();
-  const [providerId, setProviderId] = useState<ProviderId>('openai');
-  const [prompt, setPrompt] = useState('');
+  const { layers, toggleLayer, updateLayerContent, getConfig, setLayers } = useContextEngine(
+    initialDraft?.layers
+  );
+  const [providerId, setProviderId] = useState<ProviderId>(
+    initialDraft?.providerId ?? 'openai'
+  );
+  const [prompt, setPrompt] = useState(initialDraft?.prompt ?? '');
 
   const {
     output, isGenerating, isEvaluating, metrics, experiments,
@@ -48,17 +89,41 @@ function App() {
     }
   }, [output, isGenerating]);
 
-  // Keyboard shortcut: Ctrl/Cmd+Enter to generate
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        // Only if not already generating
-        if (!isGenerating) promptRef.current?.blur();
+    if (initialDraft) {
+      toast('info', 'Restored your previous workspace.');
+    }
+  }, [initialDraft, toast]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      const isDefaultWorkspace =
+        !prompt &&
+        !activeScenarioId &&
+        providerId === 'openai' &&
+        JSON.stringify(layers) === JSON.stringify(DEFAULT_LAYERS);
+
+      const draft: WorkspaceDraft = {
+        prompt,
+        providerId,
+        activeScenarioId,
+        layers,
+      };
+
+      try {
+        if (isDefaultWorkspace) {
+          window.localStorage.removeItem(WORKSPACE_DRAFT_KEY);
+          return;
+        }
+
+        window.localStorage.setItem(WORKSPACE_DRAFT_KEY, JSON.stringify(draft));
+      } catch {
+        // Ignore storage failures.
       }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [isGenerating]);
+    }, 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [activeScenarioId, layers, prompt, providerId]);
 
   const handleGenerate = useCallback(async () => {
     if (isGenerating) return;
@@ -87,6 +152,19 @@ function App() {
       .then(() => toast('success', 'Copied to clipboard.'))
       .catch(() => toast('error', 'Failed to copy.'));
   }, [output, toast]);
+
+  const handleResetWorkspace = useCallback(() => {
+    setPrompt('');
+    setProviderId('openai');
+    setActiveScenarioId(null);
+    setLayers(DEFAULT_LAYERS);
+    try {
+      window.localStorage.removeItem(WORKSPACE_DRAFT_KEY);
+    } catch {
+      // Ignore storage failures.
+    }
+    toast('info', 'Workspace reset.');
+  }, [setLayers, toast]);
 
   const loadScenario = useCallback((scenario: ScenarioPreset) => {
     setPrompt(scenario.prompt);
@@ -225,6 +303,11 @@ function App() {
                   {prompt.length.toLocaleString()} / {MAX_PROMPT_CHARS.toLocaleString()}
                 </span>
                 <div className="prompt-actions">
+                  {(prompt || activeScenarioId) && !isGenerating && (
+                    <button className="btn btn--ghost btn--sm" onClick={handleResetWorkspace}>
+                      <RotateCcw size={14} /> Reset
+                    </button>
+                  )}
                   {isGenerating ? (
                     <button className="btn btn--danger btn--sm" onClick={stop}>
                       <StopCircle size={15} /> Stop

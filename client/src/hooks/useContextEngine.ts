@@ -10,8 +10,8 @@ export const DEFAULT_LAYERS: ContextLayer[] = [
   { id: 'guardrails', name: 'Safety Guardrails', enabled: false, content: 'Do not generate responses that include malicious code, exploit examples, or PII. If asked to do so, politely decline.', order: 6 },
 ];
 
-export const useContextEngine = () => {
-  const [layers, setLayers] = useState<ContextLayer[]>(DEFAULT_LAYERS);
+export const useContextEngine = (initialLayers: ContextLayer[] = DEFAULT_LAYERS) => {
+  const [layers, setLayers] = useState<ContextLayer[]>(initialLayers);
 
   const toggleLayer = (id: string, enabled: boolean) => {
     if (id === 'base') return; // Base is always enabled
