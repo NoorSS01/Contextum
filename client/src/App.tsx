@@ -17,7 +17,7 @@ import {
   ShieldCheck, Play, StopCircle, Copy, Eye, Clock, Coins, Hash,
   BookOpen, Loader2, RotateCcw,
 } from 'lucide-react';
-import type { ContextLayer, ProviderId, ScenarioPreset } from '@shared/types';
+import type { ContextLayer, ProviderId, ResponseResult, ScenarioPreset } from '@shared/types';
 
 const MAX_PROMPT_CHARS = 4000;
 const WORKSPACE_DRAFT_KEY = 'contextum:workspace-draft';
@@ -152,6 +152,22 @@ function App() {
       .then(() => toast('success', 'Copied to clipboard.'))
       .catch(() => toast('error', 'Failed to copy.'));
   }, [output, toast]);
+
+  const handleCopyExperimentResponse = useCallback((responseText: string) => {
+    navigator.clipboard.writeText(responseText)
+      .then(() => toast('success', 'Response copied to clipboard.'))
+      .catch(() => toast('error', 'Failed to copy response.'));
+  }, [toast]);
+
+  const handleReuseExperiment = useCallback((experiment: ResponseResult) => {
+    setPrompt(experiment.prompt);
+    setProviderId(experiment.providerId);
+    setLayers(experiment.contextConfig.layers);
+    setActiveScenarioId(null);
+    promptRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    window.setTimeout(() => promptRef.current?.focus(), 250);
+    toast('success', 'Run setup loaded for a new experiment.');
+  }, [setLayers, toast]);
 
   const handleResetWorkspace = useCallback(() => {
     setPrompt('');
@@ -390,7 +406,12 @@ function App() {
         </div>
 
         {/* Comparison table */}
-        <ComparisonTable experiments={experiments} onClear={clearExperiments} />
+        <ComparisonTable
+          experiments={experiments}
+          onClear={clearExperiments}
+          onCopyResponse={handleCopyExperimentResponse}
+          onReuse={handleReuseExperiment}
+        />
       </main>
 
       <KeyManagerModal
