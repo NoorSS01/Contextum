@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { ResponseResult } from '@shared/types';
-import { BarChart3, ChevronDown, ChevronUp, Copy, RotateCcw, Trash2 } from 'lucide-react';
+import type { ResponseResult } from '@shared/types';
+import { BarChart3, ChevronDown, ChevronUp, Copy, Download, FileJson, RotateCcw, Trash2 } from 'lucide-react';
 
 interface Props {
   experiments: ResponseResult[];
@@ -19,6 +19,61 @@ const PROVIDER_COLORS: Record<string, { bg: string; color: string }> = {
   together:  { bg: 'rgba(100,116,139,.15)', color: '#94a3b8' },
 };
 
+const exportFile = (filename: string, content: string, type: string) => {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+};
+
+const csvCell = (value: unknown) => {
+  const text = String(value ?? '');
+  return `"${text.replaceAll('"', '""')}"`;
+};
+
+const toCsv = (experiments: ResponseResult[]) => {
+  const headers = [
+    'timestamp',
+    'provider',
+    'prompt',
+    'enabled_layers',
+    'response',
+    'latency_ms',
+    'tokens',
+    'estimated_cost_cent',
+    'overall',
+    'relevance',
+    'coherence',
+    'completeness',
+    'hallucination_risk',
+    'instruction_adherence',
+  ];
+
+  const rows = experiments.map(exp => [
+    exp.timestamp,
+    exp.providerId,
+    exp.prompt,
+    exp.contextConfig.layers.filter(layer => layer.enabled).map(layer => layer.name).join('; '),
+    exp.responseText,
+    exp.responseTimeMs,
+    exp.tokenCount,
+    exp.estimatedCostCent,
+    exp.evaluation?.overall ?? '',
+    exp.evaluation?.relevance ?? '',
+    exp.evaluation?.coherence ?? '',
+    exp.evaluation?.completeness ?? '',
+    exp.evaluation?.hallucinationRisk ?? '',
+    exp.evaluation?.instructionAdherence ?? '',
+  ]);
+
+  return [headers, ...rows].map(row => row.map(csvCell).join(',')).join('\n');
+};
+
+const timestampSlug = () => new Date().toISOString().replace(/[:.]/g, '-');
+
 export const ComparisonTable: React.FC<Props> = ({ experiments, onClear, onCopyResponse, onReuse }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -34,9 +89,25 @@ export const ComparisonTable: React.FC<Props> = ({ experiments, onClear, onCopyR
             <p>{experiments.length} run{experiments.length !== 1 ? 's' : ''} saved locally</p>
           </div>
         </div>
-        <button className="btn btn--ghost btn--sm" onClick={onClear} title="Clear all runs">
-          <Trash2 size={14} /> Clear
-        </button>
+        <div className="table-actions">
+          <button
+            className="btn btn--ghost btn--sm"
+            onClick={() => exportFile(`contextum-runs-${timestampSlug()}.json`, JSON.stringify(experiments, null, 2), 'application/json')}
+            title="Export runs as JSON"
+          >
+            <FileJson size={14} /> JSON
+          </button>
+          <button
+            className="btn btn--ghost btn--sm"
+            onClick={() => exportFile(`contextum-runs-${timestampSlug()}.csv`, toCsv(experiments), 'text/csv')}
+            title="Export runs as CSV"
+          >
+            <Download size={14} /> CSV
+          </button>
+          <button className="btn btn--ghost btn--sm" onClick={onClear} title="Clear all runs">
+            <Trash2 size={14} /> Clear
+          </button>
+        </div>
       </div>
 
       <div className="table-wrap">

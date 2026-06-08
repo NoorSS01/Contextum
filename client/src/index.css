@@ -1043,6 +1043,14 @@ p {
   gap: 1rem;
 }
 
+.table-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
@@ -1495,6 +1503,16 @@ p {
 
   .history-detail__actions .btn {
     flex: 1;
+  }
+
+  .table-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .table-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
 
