@@ -1051,6 +1051,39 @@ p {
   flex-wrap: wrap;
 }
 
+.history-filters {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(160px, 220px) auto;
+  gap: 0.6rem;
+  align-items: center;
+  margin: 1rem 0 0.75rem;
+}
+
+.history-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.history-search svg {
+  position: absolute;
+  left: 0.78rem;
+  color: var(--text-3);
+  pointer-events: none;
+}
+
+.history-search input {
+  padding-left: 2.2rem;
+}
+
+.history-provider-filter {
+  min-width: 0;
+}
+
+.history-empty {
+  margin-top: 0.2rem;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
@@ -1513,6 +1546,10 @@ p {
   .table-actions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .history-filters {
+    grid-template-columns: 1fr;
   }
 }
 

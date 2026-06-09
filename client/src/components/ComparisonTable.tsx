@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { ResponseResult } from '@shared/types';
-import { BarChart3, ChevronDown, ChevronUp, Copy, Download, FileJson, RotateCcw, Trash2 } from 'lucide-react';
+import { BarChart3, ChevronDown, ChevronUp, Copy, Download, FileJson, RotateCcw, Search, Trash2, X } from 'lucide-react';
 
 interface Props {
   experiments: ResponseResult[];
@@ -76,6 +76,40 @@ const timestampSlug = () => new Date().toISOString().replace(/[:.]/g, '-');
 
 export const ComparisonTable: React.FC<Props> = ({ experiments, onClear, onCopyResponse, onReuse }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [providerFilter, setProviderFilter] = useState('all');
+
+  const providerIds = useMemo(
+    () => Array.from(new Set(experiments.map(exp => exp.providerId))).sort(),
+    [experiments]
+  );
+
+  const filteredExperiments = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    return experiments.filter(exp => {
+      const matchesProvider = providerFilter === 'all' || exp.providerId === providerFilter;
+      if (!matchesProvider) return false;
+
+      if (!normalizedQuery) return true;
+
+      const enabledLayerText = exp.contextConfig.layers
+        .filter(layer => layer.enabled)
+        .map(layer => `${layer.name} ${layer.content}`)
+        .join(' ');
+
+      return [
+        exp.prompt,
+        exp.responseText,
+        exp.providerId,
+        enabledLayerText,
+        exp.evaluation?.overall,
+        exp.evaluation?.instructionAdherence,
+      ].some(value => String(value ?? '').toLowerCase().includes(normalizedQuery));
+    });
+  }, [experiments, providerFilter, query]);
+
+  const hasFilters = query.trim() !== '' || providerFilter !== 'all';
 
   if (experiments.length === 0) return null;
 
@@ -86,21 +120,25 @@ export const ComparisonTable: React.FC<Props> = ({ experiments, onClear, onCopyR
           <div className="section-title__icon"><BarChart3 size={18} /></div>
           <div>
             <h2>Comparative Analysis</h2>
-            <p>{experiments.length} run{experiments.length !== 1 ? 's' : ''} saved locally</p>
+            <p>
+              {filteredExperiments.length} of {experiments.length} run{experiments.length !== 1 ? 's' : ''} shown
+            </p>
           </div>
         </div>
         <div className="table-actions">
           <button
             className="btn btn--ghost btn--sm"
-            onClick={() => exportFile(`contextum-runs-${timestampSlug()}.json`, JSON.stringify(experiments, null, 2), 'application/json')}
-            title="Export runs as JSON"
+            onClick={() => exportFile(`contextum-runs-${timestampSlug()}.json`, JSON.stringify(filteredExperiments, null, 2), 'application/json')}
+            disabled={filteredExperiments.length === 0}
+            title="Export shown runs as JSON"
           >
             <FileJson size={14} /> JSON
           </button>
           <button
             className="btn btn--ghost btn--sm"
-            onClick={() => exportFile(`contextum-runs-${timestampSlug()}.csv`, toCsv(experiments), 'text/csv')}
-            title="Export runs as CSV"
+            onClick={() => exportFile(`contextum-runs-${timestampSlug()}.csv`, toCsv(filteredExperiments), 'text/csv')}
+            disabled={filteredExperiments.length === 0}
+            title="Export shown runs as CSV"
           >
             <Download size={14} /> CSV
           </button>
@@ -110,8 +148,48 @@ export const ComparisonTable: React.FC<Props> = ({ experiments, onClear, onCopyR
         </div>
       </div>
 
+      <div className="history-filters" aria-label="Filter saved runs">
+        <label className="history-search">
+          <Search size={15} />
+          <input
+            type="search"
+            placeholder="Search prompt, response, layers, or score..."
+            value={query}
+            onChange={event => setQuery(event.target.value)}
+          />
+        </label>
+        <select
+          className="history-provider-filter"
+          value={providerFilter}
+          onChange={event => setProviderFilter(event.target.value)}
+          aria-label="Filter by provider"
+        >
+          <option value="all">All providers</option>
+          {providerIds.map(providerId => (
+            <option key={providerId} value={providerId}>{providerId}</option>
+          ))}
+        </select>
+        {hasFilters && (
+          <button
+            className="btn btn--ghost btn--sm"
+            onClick={() => {
+              setQuery('');
+              setProviderFilter('all');
+            }}
+          >
+            <X size={14} /> Reset filters
+          </button>
+        )}
+      </div>
+
       <div className="table-wrap">
-        <table className="comparison-table">
+        {filteredExperiments.length === 0 ? (
+          <div className="empty-state history-empty">
+            <Search size={24} />
+            <p>No saved runs match these filters.</p>
+          </div>
+        ) : (
+          <table className="comparison-table">
           <thead>
             <tr>
               <th>Time</th>
@@ -125,7 +203,7 @@ export const ComparisonTable: React.FC<Props> = ({ experiments, onClear, onCopyR
             </tr>
           </thead>
           <tbody>
-            {experiments.map(exp => {
+            {filteredExperiments.map(exp => {
               const pc = PROVIDER_COLORS[exp.providerId] ?? PROVIDER_COLORS.together;
               const score = exp.evaluation?.overall;
               const scoreColor = score == null ? '#475569' : score >= 80 ? '#34d399' : score >= 55 ? '#fbbf24' : '#fb7185';
@@ -207,7 +285,8 @@ export const ComparisonTable: React.FC<Props> = ({ experiments, onClear, onCopyR
               );
             })}
           </tbody>
-        </table>
+          </table>
+        )}
       </div>
     </section>
   );
