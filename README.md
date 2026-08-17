@@ -1,4 +1,4 @@
-# Contextum
+# Contextum Web Application
 
 A local context-engineering learning platform for experimenting with, visualizing, and evaluating how different context layers change LLM outputs.
 
@@ -89,4 +89,3 @@ npm.cmd run build
 - Server builds clean `dist/` before compiling to avoid stale output.
 
 #This is a new line in the 
-#Readme File and this is the updated Readme file for better user experience
