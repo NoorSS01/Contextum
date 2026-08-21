@@ -87,3 +87,6 @@ npm.cmd run build
 - The server uses AI SDK v6 streaming and exposes `/api/generate` and `/api/evaluate`.
 - Provider keys are read from the browser vault first, then from server environment variables.
 - Server builds clean `dist/` before compiling to avoid stale output.
+
+#This is the readme file i am updating this for the better understanding if the project which is meant to teach the context engineering which is
+#One of the most important skill to have
