@@ -87,3 +87,5 @@ npm.cmd run build
 - The server uses AI SDK v6 streaming and exposes `/api/generate` and `/api/evaluate`.
 - Provider keys are read from the browser vault first, then from server environment variables.
 - Server builds clean `dist/` before compiling to avoid stale output.
+#this is the new line in readme file
+#and this is the next new line in the map refducer
