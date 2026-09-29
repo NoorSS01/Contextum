@@ -85,8 +85,3 @@ npm.cmd run build
 - The root `dev` script starts both Vite and Express through a cross-platform Node runner.
 - The Vite dev server proxies `/api/*` requests to `http://localhost:3001`, so frontend code can call relative API paths.
 - The server uses AI SDK v6 streaming and exposes `/api/generate` and `/api/evaluate`.
-- Provider keys are read from the browser vault first, then from server environment variables.
-
-hi
-this is 
-is correct
