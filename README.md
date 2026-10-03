@@ -66,3 +66,9 @@ AES-GCM encrypted API key manager stored in the browser via `idb`.
 - The root `dev` script starts both Vite and Express through a cross-platform Node runner. - The Vite dev server proxies `/api/*` requests to 
 `http://localhost:3001`, so frontend code can call relative API paths. - The server uses AI SDK v6 streaming and exposes `/api/generate` and 
 `/api/evaluate`.
+
+## Development Notes
+
+- The root `dev` script starts both Vite and Express through a cross-platform Node runner. - The Vite dev server proxies `/api/*` requests to 
+`http://localhost:3001`, so frontend code can call relative API paths. - The server uses AI SDK v6 streaming and exposes `/api/generate` and 
+`/api/evaluate`.
