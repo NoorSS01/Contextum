@@ -4,7 +4,7 @@ A local context-engineering learning platform for experimenting with, visualizin
 
 ## Architecture
 
-iiiiThe application is structured as a monorepo containing three workspaces:
+The application is structured as a monorepo containing three workspaces:
 
 - `client`: Vite + React frontend dashboard. - `server`: Express backend API and LLM proxy. - `shared`: Shared TypeScript types used by both 
 workspaces.
